@@ -21,8 +21,15 @@ DOUBLE_TAP_MS = 400   # 더블탭 인식 시간 창 (ms)
 REPEAT_INTERVAL = 0.4 # 길게 누름 반복 간격 (초)
 
 try:
-    from gpiozero import Button, GPIOPinMissing
-    from gpiozero.exc import GPIOError
+    from gpiozero import Button
+    try:
+        from gpiozero import GPIOPinMissing
+    except ImportError:
+        GPIOPinMissing = Exception
+    try:
+        from gpiozero.exc import GPIOError
+    except ImportError:
+        GPIOError = Exception
     GPIO_AVAILABLE = True
 except ImportError:
     GPIO_AVAILABLE = False
@@ -245,8 +252,15 @@ logger = logging.getLogger(__name__)
 
 # 라즈베리파이가 아닌 환경에서는 시뮬레이션
 try:
-    from gpiozero import Button, GPIOPinMissing
-    from gpiozero.exc import GPIOError
+    from gpiozero import Button
+    try:
+        from gpiozero import GPIOPinMissing
+    except ImportError:
+        GPIOPinMissing = Exception
+    try:
+        from gpiozero.exc import GPIOError
+    except ImportError:
+        GPIOError = Exception
     GPIO_AVAILABLE = True
 except ImportError:
     GPIO_AVAILABLE = False
