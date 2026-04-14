@@ -23,7 +23,11 @@ def init_web(radio_app):
     """웹 서버에 라디오 앱 참조를 주입한다."""
     global _radio, _playlists
     _radio = radio_app
-    _playlists = PlaylistManager(data_dir=os.path.dirname(os.path.dirname(os.path.dirname(__file__))) + "/data")
+    # radio 앱에 playlists가 있으면 공유, 없으면 새로 생성
+    if hasattr(radio_app, 'playlists'):
+        _playlists = radio_app.playlists
+    else:
+        _playlists = PlaylistManager(data_dir=os.path.dirname(os.path.dirname(os.path.dirname(__file__))) + "/data")
 
 
 # ─────────── 페이지 라우트 ───────────

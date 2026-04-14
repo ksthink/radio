@@ -160,6 +160,16 @@ class MPDController:
             self._ensure_connected()
             self.client.random(1 if state else 0)
 
+    def seek_relative(self, seconds: int):
+        """현재 위치에서 상대적으로 seek. 양수=앞으로, 음수=뒤로."""
+        with self._lock:
+            self._ensure_connected()
+            try:
+                sign = "+" if seconds >= 0 else ""
+                self.client.seekcur(f"{sign}{seconds}")
+            except Exception as e:
+                logger.warning("seek 실패: %s", e)
+
     def get_elapsed(self):
         status = self.get_status()
         return float(status.get("elapsed", 0))

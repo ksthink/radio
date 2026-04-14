@@ -15,6 +15,7 @@ from app.buttons import ButtonHandler
 from app.alarm import AlarmManager
 from app.weather import WeatherClient
 from app.favorites import FavoritesManager
+from app.playlists import PlaylistManager
 
 logger = logging.getLogger("piradio")
 
@@ -99,17 +100,20 @@ class PiRadio:
             update_interval=weather_cfg.get("update_interval", 1800),
         )
 
-        # 버튼
+        # 저장된 재생목록 (버튼 네비게이션 공유)
+        self.playlists = PlaylistManager(data_dir="data")
+        self._playlist_index = 0
+
+        # 버튼 (새 키 매핑)
         btn_cfg = self.config.get("buttons", {})
         self.buttons = ButtonHandler(btn_cfg, callbacks={
-            "on_play_pause": self.toggle_play_pause,
-            "on_volume_up": self.volume_up,
-            "on_volume_down": self.volume_down,
-            "on_next": self.next_channel,
-            "on_previous": self.previous_channel,
-            "on_menu": self.show_menu,
-            "on_station_list": self.show_station_list,
-            "on_clock": self.show_clock,
+            "on_a_short":       self._btn_a_short,
+            "on_x_single":      self._btn_x_single,
+            "on_x_double":      self._btn_x_double,
+            "on_seek_back":     self._btn_seek_back,
+            "on_seek_forward":  self._btn_seek_forward,
+            "on_volume_up":     self.volume_up,
+            "on_volume_down":   self.volume_down,
         })
 
         logger.info("모든 컴포넌트 초기화 완료")
@@ -156,41 +160,86 @@ class PiRadio:
         self.display.render_volume_popup(vol)
         logger.debug("볼륨: %d", vol)
 
-    def next_channel(self):
-        """다음 트랙/채널."""
-        self.display.wake()
-        # URL 재생 큐가 있으면 다음 트랙, 없으면 채널 전환
-        if self.yt_player._current_queue:
-            self.yt_player.next_track()
-            self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
-            logger.info("다음 트랙")
-        else:
-            channel = self.favorites.next_channel()
-            if channel:
-                self.display.show_message("채널 변경", channel.get("name", ""))
-                threading.Thread(
-                    target=self.yt_player.play_channel, args=(channel,), daemon=True
-                ).start()
-                self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
-                logger.info("다음 채널: %s", channel.get("name"))
+    # ─────────── 버튼 콜백 ───────────
 
-    def previous_channel(self):
-        """이전 트랙/채널."""
+    def _btn_a_short(self):
+        """A 짧게: 이전 곡 / 재생목록에서 위로."""
         self.display.wake()
-        # URL 재생 큐가 있으면 이전 트랙, 없으면 채널 전환
-        if self.yt_player._current_queue:
-            self.yt_player.previous_track()
+        if self.display.mode == DisplayManager.MODE_STATION_LIST:
+            items = self.playlists.get_playlists()
+            if items:
+                self._playlist_index = max(0, self._playlist_index - 1)
+                self._render_playlist_list()
+        else:
+            if self.yt_player._current_queue:
+                self.yt_player.previous_track()
+            else:
+                ch = self.favorites.previous_channel()
+                if ch:
+                    threading.Thread(target=self.yt_player.play_channel,
+                                     args=(ch,), daemon=True).start()
             self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
             logger.info("이전 트랙")
+
+    def _btn_x_single(self):
+        """X 싱글탭: 다음 곡 / 재생목록에서 아래로."""
+        self.display.wake()
+        if self.display.mode == DisplayManager.MODE_STATION_LIST:
+            items = self.playlists.get_playlists()
+            if items:
+                self._playlist_index = min(len(items) - 1, self._playlist_index + 1)
+                self._render_playlist_list()
         else:
-            channel = self.favorites.previous_channel()
-            if channel:
-                self.display.show_message("채널 변경", channel.get("name", ""))
-                threading.Thread(
-                    target=self.yt_player.play_channel, args=(channel,), daemon=True
-                ).start()
+            if self.yt_player._current_queue:
+                self.yt_player.next_track()
+            else:
+                ch = self.favorites.next_channel()
+                if ch:
+                    threading.Thread(target=self.yt_player.play_channel,
+                                     args=(ch,), daemon=True).start()
+            self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
+            logger.info("다음 트랙")
+
+    def _btn_x_double(self):
+        """X 더블탭: 재생목록 화면으로 / 재생목록에서 선택 재생."""
+        self.display.wake()
+        if self.display.mode == DisplayManager.MODE_STATION_LIST:
+            items = self.playlists.get_playlists()
+            if items and self._playlist_index < len(items):
+                pl = items[self._playlist_index]
+                logger.info("재생목록 선택: %s", pl['title'])
                 self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
-                logger.info("이전 채널: %s", channel.get("name"))
+                threading.Thread(target=self.yt_player.play_url,
+                                 args=(pl['url'],), daemon=True).start()
+        else:
+            self._playlist_index = 0
+            self.display.set_mode(DisplayManager.MODE_STATION_LIST)
+            self._render_playlist_list()
+            logger.info("재생목록 화면 표시")
+
+    def _btn_seek_back(self):
+        """A 길게: -5초 seek."""
+        self.display.wake()
+        self.mpd.seek_relative(-5)
+
+    def _btn_seek_forward(self):
+        """X 길게: +5초 seek."""
+        self.display.wake()
+        self.mpd.seek_relative(5)
+
+    def _render_playlist_list(self):
+        """재생목록 화면 렌더링."""
+        items = [{"name": p["title"], "description": p["url"]}
+                 for p in self.playlists.get_playlists()]
+        self.display.render_station_list(items, self._playlist_index)
+
+    def next_channel(self):
+        """웹 API용: 다음 트랙."""
+        self._btn_x_single()
+
+    def previous_channel(self):
+        """웹 API용: 이전 트랙."""
+        self._btn_a_short()
 
     def play_channel(self, index):
         """특정 인덱스의 채널 재생."""
