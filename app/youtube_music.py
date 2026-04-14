@@ -103,19 +103,47 @@ class YouTubeMusicPlayer:
         logger.info("YouTubeMusicPlayer 초기화 완료 (캐싱, 병렬 처리 활성화)")
 
     def authenticate_browser(self):
-        """브라우저를 통한 인증 (사용자 상호작용 필요)."""
+        """브라우저를 통한 인증 (사용자 상호작용 필요).
+        
+        라즈베리파이 환경에서는 직접 실행 불가능.
+        로컬 PC에서 다음을 실행:
+        python3 -c "from ytmusicapi import YTMusic; YTMusic.auth.get_headers_from_browser()"
+        
+        생성된 ~/.config/ytmusicapi/headers_auth.json을 복사해서 사용.
+        """
         try:
             from ytmusicapi import YTMusic
-            logger.info("브라우저 인증 시작...")
+            logger.info("⚠️ 라즈베리파이 환경: 브라우저 기반 인증 직접 지원 불가")
+            logger.info("📝 다음 중 하나를 선택하세요:")
+            logger.info("   1. 로컬 PC에서 다음 실행: python3 -c \"from ytmusicapi import YTMusic; YTMusic.auth.get_headers_from_browser()\"")
+            logger.info("   2. 생성된 ~/.config/ytmusicapi/headers_auth.json을 data/yt_auth.json으로 복사")
+            logger.info("   3. 또는 웹 UI의 설정에서 headers JSON을 직접 붙여넣기")
             
-            # 브라우저 기반 인증
-            headers = YTMusic.auth.get_headers_from_browser()
-            self.auth_file.write_text(json.dumps(headers))
-            self._ytmusic = YTMusic(auth=str(self.auth_file))
-            logger.info("YouTube 로그인 성공")
-            return True
+            return False
         except Exception as e:
             logger.error(f"브라우저 인증 실패: {e}")
+            return False
+
+    def set_headers_from_json(self, headers_json: str) -> bool:
+        """headers JSON 문자열로 직접 인증 (웹 UI에서 사용).
+        
+        로컬 PC에서 생성한 headers.json 내용을 직접 입력.
+        """
+        try:
+            import json
+            headers = json.loads(headers_json)
+            self.auth_file.write_text(json.dumps(headers, indent=2))
+            self._ytmusic = None  # 캐시 초기화
+            
+            # 인증 테스트
+            yt = self._get_ytmusic()
+            logger.info("✓ 인증 테스트 성공")
+            return True
+        except json.JSONDecodeError:
+            logger.error("JSON 형식이 올바르지 않음")
+            return False
+        except Exception as e:
+            logger.error(f"인증 설정 실패: {e}")
             return False
 
     def set_api_key(self, api_key: str):

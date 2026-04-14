@@ -224,17 +224,28 @@
     }
 
     async function loginYouTube() {
+        const headersText = $("#youtube-headers").value.trim();
+        
+        if (!headersText) {
+            alert("❌ headers JSON을 붙여넣으세요\n\n설정 방법:\n1. 로컬 PC에서 명령 실행: python3 -c \"from ytmusicapi import YTMusic; YTMusic.auth.get_headers_from_browser()\"\n2. ~/.config/ytmusicapi/headers_auth.json 파일의 내용 복사\n3. 위 텍스트박스에 붙여넣기");
+            return;
+        }
+        
         const btn = $("#btn-youtube-login");
         btn.disabled = true;
         btn.textContent = "로그인 중...";
         
-        const data = await post("/api/youtube/auth", { action: "login" });
+        const data = await post("/api/youtube/auth", { 
+            action: "login",
+            headers: headersText
+        });
         
         if (data && data.ok) {
             alert("✅ YouTube 로그인 성공!");
+            $("#youtube-headers").value = "";
             checkYouTubeAuth();
         } else {
-            alert("❌ YouTube 로그인 실패\n오류: " + (data ? data.message : "알 수 없는 오류"));
+            alert("❌ YouTube 로그인 실패\n\n" + (data ? data.message : "알 수 없는 오류"));
         }
         
         btn.disabled = false;

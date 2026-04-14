@@ -311,28 +311,36 @@ def api_alarm_toggle(alarm_id):
 
 @app.route("/api/youtube/auth", methods=["POST"])
 def api_youtube_auth():
-    """YouTube 브라우저 인증 시작."""
+    """YouTube 인증 처리."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
     try:
-        action = request.get_json(silent=True).get("action", "")
+        data = request.get_json(silent=True) or {}
+        action = data.get("action", "")
         
         if action == "login":
-            # 브라우저 인증 시작
-            logger.info("YouTube 브라우저 인증 시작...")
-            success = _radio.yt_player.authenticate_browser()
+            # 로컬 PC에서 생성한 headers JSON 입력
+            headers_json = data.get("headers", "")
+            if not headers_json:
+                return jsonify({
+                    "ok": False,
+                    "message": "headers JSON이 필요합니다",
+                    "instruction": "로컬 PC에서 다음 명령 실행:\npython3 -c \"from ytmusicapi import YTMusic; YTMusic.auth.get_headers_from_browser()\"\n그후 ~/.config/ytmusicapi/headers_auth.json의 내용을 복사해서 입력하세요."
+                }), 400
+            
+            success = _radio.yt_player.set_headers_from_json(headers_json)
             if success:
                 return jsonify({
                     "ok": True,
-                    "message": "YouTube 로그인 성공! (브라우저 이용)",
+                    "message": "YouTube 인증 성공!",
                     "authenticated": True
                 })
             else:
                 return jsonify({
                     "ok": False,
-                    "message": "YouTube 로그인 실패",
+                    "message": "JSON 형식이 올바르지 않거나 인증 실패",
                     "authenticated": False
-                }), 500
+                }), 400
         
         elif action == "check":
             # 인증 상태 확인

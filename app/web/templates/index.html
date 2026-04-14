@@ -130,8 +130,23 @@
         <!-- 설정 탭 -->
         <section id="tab-settings" class="tab-content">
             <div class="settings-section">
-                <h3>🔐 YouTube Music</h3>
+                <h3>🔐 YouTube Music 인증</h3>
                 <div id="youtube-auth-status" class="auth-status"></div>
+                
+                <div class="youtube-auth-instructions">
+                    <p><strong>설정 방법:</strong></p>
+                    <ol>
+                        <li>로컬 PC (Windows/Mac/Linux)에서 다음 명령 실행:
+                            <code>python3 -c "from ytmusicapi import YTMusic; YTMusic.auth.get_headers_from_browser()"</code>
+                        </li>
+                        <li>실행 후 <code>~/.config/ytmusicapi/headers_auth.json</code> 파일 열기</li>
+                        <li>파일의 모든 내용 복사</li>
+                        <li>아래 텍스트박스에 붙여넣기</li>
+                        <li>"YouTube 로그인" 버튼 클릭</li>
+                    </ol>
+                </div>
+                
+                <textarea id="youtube-headers" class="youtube-headers-input" placeholder="{'Access-Control-Allow-Credentials': 'true', ...}" rows="8"></textarea>
                 <button class="btn-primary" id="btn-youtube-login">YouTube 로그인</button>
                 <button class="btn-secondary" id="btn-youtube-check">상태 확인</button>
             </div>

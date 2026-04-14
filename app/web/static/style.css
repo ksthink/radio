@@ -538,3 +538,51 @@ body {
     font-size: 0.85rem;
     margin-bottom: 12px;
 }
+
+.youtube-auth-instructions {
+    background: rgba(255, 136, 0, 0.05);
+    border: 1px solid #ff8800;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.youtube-auth-instructions p {
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: var(--text);
+}
+
+.youtube-auth-instructions ol {
+    margin-left: 20px;
+    margin-bottom: 8px;
+}
+
+.youtube-auth-instructions li {
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.youtube-auth-instructions code {
+    background: var(--bg);
+    color: var(--accent);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    word-break: break-all;
+}
+
+.youtube-headers-input {
+    width: 100%;
+    padding: 10px;
+    background: var(--bg);
+    border: 1px solid #444;
+    color: var(--text);
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    resize: vertical;
+    margin-bottom: 12px;
+}
