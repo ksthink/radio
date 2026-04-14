@@ -157,28 +157,40 @@ class PiRadio:
         logger.debug("볼륨: %d", vol)
 
     def next_channel(self):
-        """다음 채널."""
+        """다음 트랙/채널."""
         self.display.wake()
-        channel = self.favorites.next_channel()
-        if channel:
-            self.display.show_message("채널 변경", channel.get("name", ""))
-            threading.Thread(
-                target=self.yt_player.play_channel, args=(channel,), daemon=True
-            ).start()
+        # URL 재생 큐가 있으면 다음 트랙, 없으면 채널 전환
+        if self.yt_player._current_queue:
+            self.yt_player.next_track()
             self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
-            logger.info("다음 채널: %s", channel.get("name"))
+            logger.info("다음 트랙")
+        else:
+            channel = self.favorites.next_channel()
+            if channel:
+                self.display.show_message("채널 변경", channel.get("name", ""))
+                threading.Thread(
+                    target=self.yt_player.play_channel, args=(channel,), daemon=True
+                ).start()
+                self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
+                logger.info("다음 채널: %s", channel.get("name"))
 
     def previous_channel(self):
-        """이전 채널."""
+        """이전 트랙/채널."""
         self.display.wake()
-        channel = self.favorites.previous_channel()
-        if channel:
-            self.display.show_message("채널 변경", channel.get("name", ""))
-            threading.Thread(
-                target=self.yt_player.play_channel, args=(channel,), daemon=True
-            ).start()
+        # URL 재생 큐가 있으면 이전 트랙, 없으면 채널 전환
+        if self.yt_player._current_queue:
+            self.yt_player.previous_track()
             self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
-            logger.info("이전 채널: %s", channel.get("name"))
+            logger.info("이전 트랙")
+        else:
+            channel = self.favorites.previous_channel()
+            if channel:
+                self.display.show_message("채널 변경", channel.get("name", ""))
+                threading.Thread(
+                    target=self.yt_player.play_channel, args=(channel,), daemon=True
+                ).start()
+                self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
+                logger.info("이전 채널: %s", channel.get("name"))
 
     def play_channel(self, index):
         """특정 인덱스의 채널 재생."""

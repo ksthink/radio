@@ -295,12 +295,14 @@ JSON 파싱 오류: {e}
                     if not video_id:
                         continue
                     
+                    # 비디오 ID로 thumbnail URL 직접 구성 (--flat-playlist는 thumbnail이 없는 경우 많음)
+                    thumbnail = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
                     track = {
                         "id": video_id,
                         "title": item.get('title', '알 수 없음'),
-                        "artist": item.get('uploader', '') or item.get('channel', ''),
+                        "artist": item.get('uploader', '') or item.get('channel', '') or item.get('artist', ''),
                         "duration": item.get('duration', 0),
-                        "thumbnail": item.get('thumbnail', ''),
+                        "thumbnail": thumbnail,
                     }
                     tracks.append(track)
                 except json.JSONDecodeError:
