@@ -12,16 +12,13 @@
         <!-- 헤더 -->
         <header class="header">
             <h1>📻 PiRadio</h1>
-            <span id="clock" class="clock"></span>
+            <button class="header-btn" id="btn-login-header" title="YouTube 로그인">🔐</button>
         </header>
 
         <!-- 탭 네비게이션 -->
         <nav class="tabs">
             <button class="tab active" data-tab="player">재생</button>
             <button class="tab" data-tab="channels">채널</button>
-            <button class="tab" data-tab="search">검색</button>
-            <button class="tab" data-tab="alarm">알람</button>
-            <button class="tab" data-tab="settings">설정</button>
         </nav>
 
         <!-- 재생 탭 -->
@@ -80,137 +77,28 @@
                 <input type="text" id="add-id" placeholder="YouTube Music 재생목록 ID">
                 <select id="add-type">
                     <option value="playlist">재생목록</option>
-                    <option value="radio">라디오 (자동재생)</option>
-                    <option value="track">단일 트랙</option>
+                    <option value="radio">라디오</option>
                 </select>
                 <button class="btn-add" id="btn-add-channel">추가</button>
             </div>
         </section>
+    </div>
 
-        <!-- 검색 탭 -->
-        <section id="tab-search" class="tab-content">
-            <div class="search-bar">
-                <input type="text" id="search-input" placeholder="YouTube Music 검색...">
-                <select id="search-type">
-                    <option value="songs">곡</option>
-                    <option value="playlists">재생목록</option>
-                    <option value="podcasts">팟캐스트</option>
-                    <option value="albums">앨범</option>
-                    <option value="artists">아티스트</option>
-                </select>
-                <button class="btn-search" id="btn-search">검색</button>
+    <!-- 로그인 모달 -->
+    <div id="login-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>YouTube 로그인</h2>
+                <button class="modal-close" id="btn-close-login">&times;</button>
             </div>
-            <div class="search-results" id="search-results"></div>
-        </section>
-
-        <!-- 알람 탭 -->
-        <section id="tab-alarm" class="tab-content">
-            <div class="alarm-list" id="alarm-list"></div>
-            <div class="alarm-add">
-                <h3>알람 추가</h3>
-                <div class="alarm-time-input">
-                    <input type="number" id="alarm-hour" min="0" max="23" value="7" placeholder="시">
-                    <span>:</span>
-                    <input type="number" id="alarm-minute" min="0" max="59" value="0" placeholder="분">
-                </div>
-                <div class="alarm-days">
-                    <label><input type="checkbox" value="0"> 월</label>
-                    <label><input type="checkbox" value="1"> 화</label>
-                    <label><input type="checkbox" value="2"> 수</label>
-                    <label><input type="checkbox" value="3"> 목</label>
-                    <label><input type="checkbox" value="4"> 금</label>
-                    <label><input type="checkbox" value="5"> 토</label>
-                    <label><input type="checkbox" value="6"> 일</label>
-                </div>
-                <input type="text" id="alarm-label" placeholder="알람 이름 (선택)">
-                <button class="btn-add" id="btn-add-alarm">알람 추가</button>
+            <div class="modal-body">
+                <p>로컬 PC에서 <code>python3 get_youtube_headers.py</code> 실행 후 JSON을 붙여넣으세요.</p>
+                <textarea id="login-headers" class="login-headers-input" placeholder='{"Authorization": "SAPISIDHASH ...", "User-Agent": "Mozilla/5.0 ..."}' rows="5"></textarea>
+                <button class="btn-primary" id="btn-do-login" style="width:100%; margin-top:10px;">로그인</button>
+                <div id="login-status" class="login-status"></div>
             </div>
-        </section>
-
-        <!-- 설정 탭 -->
-        <section id="tab-settings" class="tab-content">
-            <div class="settings-section">
-                <h3>🔐 YouTube Music 인증</h3>
-                <div id="youtube-auth-status" class="auth-status"></div>
-                
-                <div class="youtube-auth-instructions">
-                    <p><strong>⚡ 최간단 방법 (추천):</strong></p>
-                    <ol>
-                        <li><strong>로컬 PC 터미널</strong>에서 실행:
-                            <code style="display: block; background: #f0f0f0; padding: 4px; border-radius: 3px; font-family: monospace; margin: 4px 0;">python3 get_youtube_headers.py</code>
-                        </li>
-                        <li>나오는 JSON을 <strong>전체 복사</strong></li>
-                        <li>아래 텍스트박스에 붙여넣기</li>
-                        <li>"YouTube 로그인" 버튼 클릭</li>
-                    </ol>
-                    
-                    <hr style="margin: 12px 0; opacity: 0.3;">
-                    
-                    <p><strong>📖 수동 방법 (개발자 도구 사용):</strong></p>
-                    <ol>
-                        <li><strong>로컬 PC</strong>에서 YouTube Music 웹사이트 방문:
-                            <a href="https://music.youtube.com" target="_blank">https://music.youtube.com</a>
-                        </li>
-                        <li>Google 계정으로 로그인</li>
-                        <li>
-                            브라우저 개발자 도구 열기:
-                            <code>Windows/Linux: F12</code> 또는 <code>Mac: Cmd+Option+I</code>
-                        </li>
-                        <li>'Network' 탭에서 any YouTube request의 'Request Headers' 확인</li>
-                        <li><strong>Authorization</strong> 또는 <strong>Cookie</strong> 헤더 복사</li>
-                        <li>아래 JSON 형식으로 작성하여 붙여넣기</li>
-                    </ol>
-                    
-                    <p style="margin-top: 12px; font-size: 0.85rem; background: #fff3cd; padding: 8px; border-radius: 3px;"><strong>✓ 올바른 JSON 형식:</strong></p>
-                    <pre style="background: #f5f5f5; padding: 8px; border-radius: 3px; font-size: 0.75rem; overflow-x: auto; margin: 4px 0;">방법 A) SAPISID:
-{
-  "Authorization": "SAPISIDHASH [복사한값]",
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-}
-
-방법 B) Cookie:
-{
-  "Cookie": "[복사한쿠키값]",
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-}</pre>
-                </div>
-                
-                <textarea id="youtube-headers" class="youtube-headers-input" placeholder="{&#10;  &quot;Authorization&quot;: &quot;SAPISIDHASH ...&quot;,&#10;  &quot;User-Agent&quot;: &quot;Mozilla/5.0 ...&quot;&#10;}" rows="8"></textarea>
-                <button class="btn-primary" id="btn-youtube-login">YouTube 로그인</button>
-                <button class="btn-secondary" id="btn-youtube-check">상태 확인</button>
-                <button class="btn-secondary" id="btn-load-library">📚 라이브러리 불러오기</button>
-                <div id="youtube-library" class="youtube-library"></div>
-            </div>
-
-            <div class="settings-section">
-                <h3>🎮 버튼 진단</h3>
-                <button class="btn-secondary" id="btn-diagnose">진단 실행</button>
-                <div id="diagnose-result" class="diagnose-result"></div>
-            </div>
-
-            <div class="settings-section">
-                <h3>🎮 버튼 테스트</h3>
-                <p class="note">각 버튼을 테스트하려면 아래 버튼을 클릭하세요</p>
-                <div class="button-test-grid">
-                    <button class="btn-test" data-button="a" data-long="false">A (짧게)</button>
-                    <button class="btn-test" data-button="a" data-long="true">A (길게)</button>
-                    <button class="btn-test" data-button="b" data-long="false">B (짧게)</button>
-                    <button class="btn-test" data-button="b" data-long="true">B (길게)</button>
-                    <button class="btn-test" data-button="x" data-long="false">X (짧게)</button>
-                    <button class="btn-test" data-button="x" data-long="true">X (길게)</button>
-                    <button class="btn-test" data-button="y" data-long="false">Y (짧게)</button>
-                    <button class="btn-test" data-button="y" data-long="true">Y (길게)</button>
-                </div>
-                <div id="test-result" class="test-result"></div>
-            </div>
-
-            <div class="settings-section">
-                <h3>ℹ️ 정보</h3>
-                <p><strong>버전:</strong> PiRadio v2.0</p>
-                <p><strong>최적화:</strong> URL 캐싱, 병렬 처리</p>
-                <p><a href="https://github.com/ksthink/radio" target="_blank">GitHub 저장소</a></p>
-            </div>
-        </section>
+        </div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
     <script src="/static/app.js"></script>

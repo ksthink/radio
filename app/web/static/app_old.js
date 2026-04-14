@@ -1,0 +1,487 @@
+// PiRadio 웹 리모컨 앱
+(function () {
+    "use strict";
+
+    const API = "";
+    let socket = null;
+    let pollTimer = null;
+
+    // ─── 유틸 ───
+    function formatTime(sec) {
+        sec = Math.floor(sec || 0);
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return m + ":" + String(s).padStart(2, "0");
+    }
+
+    function $(sel) { return document.querySelector(sel); }
+    function $$(sel) { return document.querySelectorAll(sel); }
+
+    async function api(path, opts) {
+        try {
+            const resp = await fetch(API + path, opts);
+            return await resp.json();
+        } catch (e) {
+            console.error("API 오류:", path, e);
+            return null;
+        }
+    }
+    function post(path, body) {
+        return api(path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: body ? JSON.stringify(body) : undefined,
+        });
+    }
+
+    // ─── 상태 업데이트 ───
+    function updateStatus(data) {
+        if (!data) return;
+
+        // 트랙 정보
+        const t = data.track || {};
+        $("#track-title").textContent = t.title || "재생 대기 중";
+        $("#track-artist").textContent = t.artist || "";
+
+        // 앨범아트
+        const artEl = $("#album-art");
+        if (t.thumbnail) {
+            artEl.innerHTML = `<img src="${t.thumbnail}" alt="앨범아트">`;
+        } else {
+            artEl.innerHTML = '<span class="music-icon">♫</span>';
+        }
+
+        // 채널
+        const ch = data.channel || {};
+        $("#channel-name").textContent = ch.name ? `📻 ${ch.name}` : "";
+
+        // 재생 상태
+        const playBtn = $("#btn-play");
+        playBtn.textContent = data.state === "play" ? "⏸" : "▶";
+
+        // 프로그레스
+        $("#elapsed").textContent = formatTime(data.elapsed);
+        $("#duration").textContent = formatTime(data.duration);
+        const ratio = data.duration > 0 ? (data.elapsed / data.duration * 100) : 0;
+        $("#progress-fill").style.width = ratio + "%";
+
+        // 볼륨
+        const volSlider = $("#volume-slider");
+        if (document.activeElement !== volSlider) {
+            volSlider.value = data.volume;
+        }
+        $("#volume-value").textContent = data.volume + "%";
+
+        // 슬립 타이머
+        const sleepRemain = $("#sleep-remaining");
+        if (data.sleep_remaining && data.sleep_remaining > 0) {
+            sleepRemain.textContent = formatTime(data.sleep_remaining) + " 남음";
+        } else {
+            sleepRemain.textContent = "";
+        }
+    }
+
+    async function refreshStatus() {
+        const data = await api("/api/status");
+        if (data) updateStatus(data);
+    }
+
+    // ─── 채널 ───
+    async function loadChannels() {
+        const data = await api("/api/channels");
+        if (!data) return;
+        const list = $("#channel-list");
+        list.innerHTML = "";
+        (data.channels || []).forEach(function (ch, i) {
+            const active = i === data.current ? " active" : "";
+            const div = document.createElement("div");
+            div.className = "channel-item" + active;
+            div.innerHTML = `
+                <div class="ch-info">
+                    <div class="ch-name">${escapeHtml(ch.name)}</div>
+                    <div class="ch-desc">${escapeHtml(ch.description || ch.artist || "")}</div>
+                </div>
+                <div class="ch-actions">
+                    <button class="ch-del" data-index="${i}" title="삭제">✕</button>
+                </div>`;
+            div.querySelector(".ch-info").addEventListener("click", function () {
+                post("/api/channels/" + i + "/play");
+            });
+            div.querySelector(".ch-del").addEventListener("click", function (e) {
+                e.stopPropagation();
+                if (confirm("'" + ch.name + "' 채널을 삭제하시겠습니까?")) {
+                    api("/api/channels/" + i, { method: "DELETE" }).then(loadChannels);
+                }
+            });
+            list.appendChild(div);
+        });
+    }
+
+    // ─── 검색 ───
+    async function doSearch() {
+        const q = $("#search-input").value.trim();
+        const type = $("#search-type").value;
+        if (!q) return;
+
+        const data = await api("/api/search?q=" + encodeURIComponent(q) + "&type=" + type);
+        const container = $("#search-results");
+        container.innerHTML = "";
+        if (!data || !data.results || data.results.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:20px">결과 없음</div>';
+            return;
+        }
+        data.results.forEach(function (item) {
+            const div = document.createElement("div");
+            div.className = "search-result";
+            div.innerHTML = `
+                ${item.thumbnail ? `<img class="sr-thumb" src="${item.thumbnail}" alt="">` : '<div class="sr-thumb"></div>'}
+                <div class="sr-info">
+                    <div class="sr-title">${escapeHtml(item.title)}</div>
+                    <div class="sr-artist">${escapeHtml(item.artist || item.author || "")}</div>
+                </div>
+                <div class="sr-actions">
+                    <button class="sr-btn sr-btn-play">▶</button>
+                    <button class="sr-btn sr-btn-fav">+♡</button>
+                </div>`;
+            div.querySelector(".sr-btn-play").addEventListener("click", function () {
+                post("/api/search/play", { id: item.id, title: item.title, artist: item.artist || item.author || "", thumbnail: item.thumbnail || "" });
+            });
+            div.querySelector(".sr-btn-fav").addEventListener("click", function () {
+                post("/api/channels", {
+                    id: item.id,
+                    name: item.title,
+                    type: item.type === "podcast" ? "playlist" : (item.type || "radio"),
+                    description: item.artist || item.author || "",
+                }).then(function () {
+                    loadChannels();
+                    alert("'" + item.title + "' 채널에 추가됨");
+                });
+            });
+            container.appendChild(div);
+        });
+    }
+
+    // ─── 알람 ───
+    async function loadAlarms() {
+        const data = await api("/api/alarms");
+        if (!data) return;
+        const list = $("#alarm-list");
+        list.innerHTML = "";
+        const dayNames = ["월", "화", "수", "목", "금", "토", "일"];
+        (data.alarms || []).forEach(function (alarm) {
+            const div = document.createElement("div");
+            div.className = "alarm-item";
+            const daysText = alarm.days
+                ? alarm.days.map(function (d) { return dayNames[d]; }).join(" ")
+                : "매일";
+            const onOff = alarm.enabled ? "on" : "off";
+            div.innerHTML = `
+                <div class="alarm-time">${String(alarm.hour).padStart(2, "0")}:${String(alarm.minute).padStart(2, "0")}</div>
+                <div class="alarm-info">
+                    <div class="alarm-label">${escapeHtml(alarm.label || "알람")}</div>
+                    <div class="alarm-days-text">${daysText}</div>
+                </div>
+                <button class="alarm-toggle ${onOff}" data-id="${alarm.id}"></button>
+                <button class="alarm-del" data-id="${alarm.id}">✕</button>`;
+            div.querySelector(".alarm-toggle").addEventListener("click", function () {
+                post("/api/alarms/" + alarm.id + "/toggle").then(loadAlarms);
+            });
+            div.querySelector(".alarm-del").addEventListener("click", function () {
+                api("/api/alarms/" + alarm.id, { method: "DELETE" }).then(loadAlarms);
+            });
+            list.appendChild(div);
+        });
+    }
+
+    // ─── 시계 ───
+    function updateClock() {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, "0");
+        const m = String(now.getMinutes()).padStart(2, "0");
+        const s = String(now.getSeconds()).padStart(2, "0");
+        $("#clock").textContent = h + ":" + m + ":" + s;
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement("div");
+        div.textContent = str || "";
+        return div.innerHTML;
+    }
+
+    // ─── YouTube 인증 ───
+    async function checkYouTubeAuth() {
+        const data = await post("/api/youtube/auth", { action: "check" });
+        const statusEl = $("#youtube-auth-status");
+        if (!data) {
+            statusEl.innerHTML = '<div class="status-error">⚠️ 인증 상태 확인 실패</div>';
+            return;
+        }
+        if (data.authenticated) {
+            statusEl.innerHTML = '<div class="status-ok">✅ YouTube 로그인됨</div>';
+        } else {
+            statusEl.innerHTML = '<div class="status-warning">🔓 로그인 필요</div>';
+        }
+    }
+
+    async function loginYouTube() {
+        const headersText = $("#youtube-headers").value.trim();
+        
+        if (!headersText) {
+            alert("❌ headers JSON을 붙여넣으세요\n\n📝 설정 방법:\n1. 로컬 PC 터미널에서: python3 get_youtube_headers.py\n2. 나오는 JSON 전체를 복사\n3. 위 텍스트박스에 붙여넣기");
+            return;
+        }
+        
+        // JSON 유효성 검사
+        try {
+            const parsed = JSON.parse(headersText);
+            
+            // 필수 필드 확인
+            if (!parsed.Authorization && !parsed.Cookie) {
+                alert("❌ JSON에 Authorization 또는 Cookie가 필요합니다.\n\n올바른 형식:\n\n방법 A) SAPISID 사용:\n{\n  \"Authorization\": \"SAPISIDHASH [값]\",\n  \"User-Agent\": \"Mozilla/5.0 ...\"\n}\n\n방법 B) Cookie 사용:\n{\n  \"Cookie\": \"...\",\n  \"User-Agent\": \"Mozilla/5.0 ...\"\n}");
+                return;
+            }
+            
+            if (!parsed["User-Agent"]) {
+                alert("❌ JSON에 User-Agent가 필요합니다.\n\n올바른 형식:\n{\n  \"Authorization\": \"SAPISIDHASH ...\",\n  \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ...\"\n}");
+                return;
+            }
+        } catch (e) {
+            alert("❌ JSON 형식이 올바르지 않습니다.\n\n오류: " + e.message + "\n\nJSON을 확인하고 다시 시도하세요.");
+            return;
+        }
+        
+        const btn = $("#btn-youtube-login");
+        btn.disabled = true;
+        btn.textContent = "로그인 중...";
+        
+        const data = await post("/api/youtube/auth", { 
+            action: "login",
+            headers: headersText
+        });
+        
+        if (data && data.ok) {
+            alert("✅ YouTube 로그인 성공!");
+            $("#youtube-headers").value = "";
+            checkYouTubeAuth();
+            loadYouTubeLibrary();
+        } else {
+            alert("❌ YouTube 로그인 실패\n\n" + (data ? data.message : "알 수 없는 오류"));
+        }
+        
+        btn.disabled = false;
+        btn.textContent = "YouTube 로그인";
+    }
+
+    async function loadYouTubeLibrary() {
+        const libraryEl = $("#youtube-library");
+        libraryEl.innerHTML = '<div class="loading">라이브러리 불러오는 중...</div>';
+        
+        const data = await api("/api/youtube/library");
+        
+        if (!data || data.error) {
+            libraryEl.innerHTML = `<div class="status-warning">⚠️ ${data ? data.error : "로드 실패"}</div>`;
+            return;
+        }
+        
+        if (!data.playlists || data.playlists.length === 0) {
+            libraryEl.innerHTML = '<div class="status-warning">📭 저장된 플레이리스트가 없습니다</div>';
+            return;
+        }
+        
+        let html = '<div class="library-list">';
+        html += `<p style="color: var(--text-dim); font-size: 0.85rem;">📚 ${data.count}개 플레이리스트 찾음</p>`;
+        
+        data.playlists.forEach(function (p, idx) {
+            html += `
+                <div class="library-item">
+                    <div class="library-info">
+                        <div class="library-title">${escapeHtml(p.title)}</div>
+                        <div class="library-desc">${escapeHtml(p.description)}</div>
+                    </div>
+                    <button class="library-add" data-index="${idx}" data-id="${p.id}" data-title="${p.title}">➕ 추가</button>
+                </div>`;
+        });
+        
+        html += '</div>';
+        libraryEl.innerHTML = html;
+        
+        // 이벤트 리스너 추가
+        $$(".library-add").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                const plId = this.dataset.id;
+                const plTitle = this.dataset.title;
+                
+                post("/api/channels", {
+                    id: plId,
+                    name: plTitle,
+                    type: "playlist",
+                    description: "YouTube Music 라이브러리"
+                }).then(function () {
+                    loadChannels();
+                    alert("✅ '" + plTitle + "' 채널에 추가됨");
+                    libraryEl.innerHTML = '';  // 추가 후 라이브러리 숨기기
+                });
+            });
+        });
+    }
+
+    // ─── 버튼 진단 ───
+    async function diagnoseButtons() {
+        const resultEl = $("#diagnose-result");
+        resultEl.innerHTML = '<div class="loading">진단 중...</div>';
+        
+        const data = await api("/api/buttons/diagnose");
+        if (!data) {
+            resultEl.innerHTML = '<div class="status-error">진단 실패</div>';
+            return;
+        }
+
+        let html = '<div class="diagnose-info">';
+        html += `<p><strong>GPIO 사용 가능:</strong> ${data.gpio_available ? '✅ 예' : '❌ 아니오'}</p>`;
+        html += `<p><strong>버튼 초기화:</strong> ${data.buttons_initialized}/4</p>`;
+        html += `<p><strong>길게누르기:</strong> ${data.long_press_ms}ms</p>`;
+        html += `<p><strong>디바운싱:</strong> ${data.debounce_ms}ms</p>`;
+        html += '<p><strong>개별 버튼 상태:</strong></p>';
+        html += '<ul>';
+        for (const [name, info] of Object.entries(data.buttons)) {
+            const status = info.initialized ? '✅' : '❌';
+            html += `<li>${name.toUpperCase()} (BCM ${info.pin}): ${status} ${info.state}</li>`;
+        }
+        html += '</ul>';
+        html += '</div>';
+        
+        resultEl.innerHTML = html;
+    }
+
+    // ─── 버튼 테스트 ───
+    async function testButton(button, long) {
+        const resultEl = $("#test-result");
+        resultEl.innerHTML = `<div class="loading">테스트 중... (버튼 ${button.toUpperCase()} ${long ? '길게' : '짧게'})</div>`;
+        
+        const data = await post("/api/buttons/test", { 
+            button: button.toLowerCase(), 
+            long: long === 'true' || long === true 
+        });
+        
+        if (data && data.ok) {
+            resultEl.innerHTML = `<div class="status-ok">✅ ${data.message}</div>`;
+        } else {
+            resultEl.innerHTML = `<div class="status-error">❌ 테스트 실패</div>`;
+        }
+        
+        setTimeout(function () {
+            resultEl.innerHTML = '';
+        }, 3000);
+    }
+
+    // ─── 초기화 ───
+    function init() {
+        // 탭 전환
+        $$(".tab").forEach(function (tab) {
+            tab.addEventListener("click", function () {
+                $$(".tab").forEach(function (t) { t.classList.remove("active"); });
+                $$(".tab-content").forEach(function (c) { c.classList.remove("active"); });
+                tab.classList.add("active");
+                $("#tab-" + tab.dataset.tab).classList.add("active");
+
+                if (tab.dataset.tab === "channels") loadChannels();
+                if (tab.dataset.tab === "alarm") loadAlarms();
+            });
+        });
+
+        // 플레이어 컨트롤
+        $("#btn-play").addEventListener("click", function () { post("/api/play"); });
+        $("#btn-stop").addEventListener("click", function () { post("/api/stop"); });
+        $("#btn-next").addEventListener("click", function () { post("/api/next"); });
+        $("#btn-prev").addEventListener("click", function () { post("/api/previous"); });
+        $("#btn-vol-up").addEventListener("click", function () { post("/api/volume/up"); });
+        $("#btn-vol-down").addEventListener("click", function () { post("/api/volume/down"); });
+
+        // 볼륨 슬라이더
+        let volTimeout = null;
+        $("#volume-slider").addEventListener("input", function () {
+            const vol = parseInt(this.value);
+            $("#volume-value").textContent = vol + "%";
+            clearTimeout(volTimeout);
+            volTimeout = setTimeout(function () {
+                post("/api/volume", { volume: vol });
+            }, 150);
+        });
+
+        // 슬립 타이머
+        $("#sleep-select").addEventListener("change", function () {
+            post("/api/sleep", { minutes: parseInt(this.value) });
+        });
+
+        // 검색
+        $("#btn-search").addEventListener("click", doSearch);
+        $("#search-input").addEventListener("keydown", function (e) {
+            if (e.key === "Enter") doSearch();
+        });
+
+        // 채널 추가
+        $("#btn-add-channel").addEventListener("click", function () {
+            const name = $("#add-name").value.trim();
+            const id = $("#add-id").value.trim();
+            const type = $("#add-type").value;
+            if (!name || !id) { alert("이름과 ID를 입력하세요"); return; }
+            post("/api/channels", { name: name, id: id, type: type }).then(function () {
+                $("#add-name").value = "";
+                $("#add-id").value = "";
+                loadChannels();
+            });
+        });
+
+        // 알람 추가
+        $("#btn-add-alarm").addEventListener("click", function () {
+            const hour = parseInt($("#alarm-hour").value);
+            const minute = parseInt($("#alarm-minute").value);
+            const label = $("#alarm-label").value.trim();
+            const dayCheckboxes = $$('.alarm-days input[type="checkbox"]:checked');
+            let days = null;
+            if (dayCheckboxes.length > 0 && dayCheckboxes.length < 7) {
+                days = Array.from(dayCheckboxes).map(function (cb) { return parseInt(cb.value); });
+            }
+            post("/api/alarms", { hour: hour, minute: minute, days: days, label: label }).then(function () {
+                $("#alarm-label").value = "";
+                loadAlarms();
+            });
+        });
+
+        // YouTube 인증
+        checkYouTubeAuth();
+        $("#btn-youtube-login").addEventListener("click", loginYouTube);
+        $("#btn-youtube-check").addEventListener("click", checkYouTubeAuth);
+        $("#btn-load-library").addEventListener("click", loadYouTubeLibrary);
+
+        // 버튼 진단
+        $("#btn-diagnose").addEventListener("click", diagnoseButtons);
+
+        // 버튼 테스트
+        $$(".btn-test").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                testButton(this.dataset.button, this.dataset.long);
+            });
+        });
+
+        // WebSocket
+        try {
+            socket = io();
+            socket.on("status", updateStatus);
+        } catch (e) {
+            console.warn("WebSocket 연결 불가, 폴링 모드");
+        }
+
+        // 주기적 상태 갱신
+        refreshStatus();
+        pollTimer = setInterval(refreshStatus, 3000);
+        setInterval(updateClock, 1000);
+        updateClock();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+    } else {
+        init();
+    }
+})();
