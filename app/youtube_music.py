@@ -208,11 +208,20 @@ class YouTubeMusicPlayer:
             logger.error("라디오 트랙 가져오기 실패: %s", e)
             return []
 
-    def play_track(self, video_id: str, title: str = ""):
+    def play_track(self, video_id: str, title: str = "", artist: str = "", thumbnail: str = ""):
         """단일 트랙을 재생한다."""
         stream_url = self.extract_stream_url(video_id)
         if stream_url:
             self.mpd.add_and_play(stream_url)
+            with self._lock:
+                self._current_queue = [{
+                    "id": video_id,
+                    "title": title,
+                    "artist": artist,
+                    "thumbnail": thumbnail,
+                }]
+                self._current_index = 0
+                self._current_channel = None
             logger.info("재생 시작: %s (%s)", title, video_id)
             return True
         logger.error("재생 실패: %s", video_id)

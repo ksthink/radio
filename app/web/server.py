@@ -248,9 +248,11 @@ def api_search_play():
         data = request.get_json(silent=True) or {}
         video_id = data.get("id", "")
         title = data.get("title", "")
+        artist = data.get("artist", "")
+        thumbnail = data.get("thumbnail", "")
         if not video_id:
             return jsonify({"error": "ID 필요"}), 400
-        success = _radio.yt_player.play_track(video_id, title)
+        success = _radio.yt_player.play_track(video_id, title, artist=artist, thumbnail=thumbnail)
         return jsonify({"ok": success})
     except Exception as e:
         logger.error("검색 재생 오류: %s", e)

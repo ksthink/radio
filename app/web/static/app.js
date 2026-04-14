@@ -144,7 +144,7 @@
                     <button class="sr-btn sr-btn-fav">+♡</button>
                 </div>`;
             div.querySelector(".sr-btn-play").addEventListener("click", function () {
-                post("/api/search/play", { id: item.id, title: item.title });
+                post("/api/search/play", { id: item.id, title: item.title, artist: item.artist || item.author || "", thumbnail: item.thumbnail || "" });
             });
             div.querySelector(".sr-btn-fav").addEventListener("click", function () {
                 post("/api/channels", {
