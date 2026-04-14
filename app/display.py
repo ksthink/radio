@@ -1,9 +1,12 @@
 """ST7789 디스플레이 매니저 - 240x240 LCD 제어"""
 
+import hashlib
+import io
 import logging
 import os
 import time
 import threading
+import urllib.request
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
@@ -76,6 +79,10 @@ class DisplayManager:
         self._list_offset = 0
         self._list_selected = 0
         self._menu_items = []
+
+        # 썸네일 캐시 (URL -> PIL Image)
+        self._thumb_cache = {}  # {url: Image}
+        self._thumb_cache_max = 20
 
     def _load_fonts(self, config):
         """폰트를 로드한다."""
@@ -161,6 +168,34 @@ class DisplayManager:
         vol_text = f"{volume}%"
         self.draw.text((bar_x + bar_width + 5, y - 2), vol_text, fill=COLOR_DIM, font=self.font_tiny)
 
+    def _get_thumbnail(self, url: str, size: int) -> Image.Image | None:
+        """URL에서 썸네일을 다운로드하고 캐싱하여 PIL Image로 반환."""
+        if not url:
+            return None
+        if url in self._thumb_cache:
+            return self._thumb_cache[url]
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = resp.read()
+            img = Image.open(io.BytesIO(data)).convert("RGB")
+            # 정사각형으로 크롭 (중앙)
+            w, h = img.size
+            crop = min(w, h)
+            left = (w - crop) // 2
+            top = (h - crop) // 2
+            img = img.crop((left, top, left + crop, top + crop))
+            img = img.resize((size, size), Image.LANCZOS)
+            # 캐시 저장 (최대 개수 초과 시 가장 오래된 것 삭제)
+            if len(self._thumb_cache) >= self._thumb_cache_max:
+                oldest = next(iter(self._thumb_cache))
+                del self._thumb_cache[oldest]
+            self._thumb_cache[url] = img
+            return img
+        except Exception as e:
+            logger.debug("썸네일 다운로드 실패 (%s): %s", url, e)
+            return None
+
     def render_now_playing(self, track_info=None, status=None, volume=50):
         """현재 재생 중인 곡 화면."""
         with self._lock:
@@ -183,18 +218,23 @@ class DisplayManager:
             # 구분선
             self.draw.line([(10, 30), (230, 30)], fill=(40, 40, 40), width=1)
 
-            # 앨범아트 영역 (썸네일이 있으면 표시)
+            # 앨범아트 영역
             art_size = 100
             art_x = (self.WIDTH - art_size) // 2
             art_y = 40
-            self.draw.rectangle(
-                [(art_x, art_y), (art_x + art_size, art_y + art_size)],
-                fill=(30, 30, 40)
-            )
-            self.draw.text(
-                (art_x + 35, art_y + 35), "♫",
-                fill=COLOR_ACCENT, font=self.font_large
-            )
+            thumbnail_url = track_info.get("thumbnail", "")
+            thumb_img = self._get_thumbnail(thumbnail_url, art_size)
+            if thumb_img:
+                self.buffer.paste(thumb_img, (art_x, art_y))
+            else:
+                self.draw.rectangle(
+                    [(art_x, art_y), (art_x + art_size, art_y + art_size)],
+                    fill=(30, 30, 40)
+                )
+                self.draw.text(
+                    (art_x + 35, art_y + 35), "♫",
+                    fill=COLOR_ACCENT, font=self.font_large
+                )
 
             # 곡 제목
             title = track_info.get("title", "알 수 없음")
