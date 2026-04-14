@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🎵 PiRadio</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📻</text></svg>">
+</head>
+<body>
+    <div id="app">
+        <!-- 헤더 -->
+        <header class="header">
+            <h1>📻 PiRadio</h1>
+            <span id="clock" class="clock"></span>
+        </header>
+
+        <!-- 탭 네비게이션 -->
+        <nav class="tabs">
+            <button class="tab active" data-tab="player">재생</button>
+            <button class="tab" data-tab="channels">채널</button>
+            <button class="tab" data-tab="search">검색</button>
+            <button class="tab" data-tab="alarm">알람</button>
+        </nav>
+
+        <!-- 재생 탭 -->
+        <section id="tab-player" class="tab-content active">
+            <div class="now-playing">
+                <div class="album-art" id="album-art">
+                    <span class="music-icon">♫</span>
+                </div>
+                <div class="track-info">
+                    <div class="track-title" id="track-title">재생 대기 중</div>
+                    <div class="track-artist" id="track-artist"></div>
+                    <div class="channel-name" id="channel-name"></div>
+                </div>
+                <div class="progress-container">
+                    <span id="elapsed">0:00</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <span id="duration">0:00</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="ctrl-btn" id="btn-prev" title="이전">⏮</button>
+                <button class="ctrl-btn ctrl-btn-main" id="btn-play" title="재생/일시정지">▶</button>
+                <button class="ctrl-btn" id="btn-next" title="다음">⏭</button>
+                <button class="ctrl-btn" id="btn-stop" title="정지">⏹</button>
+            </div>
+
+            <div class="volume-control">
+                <button class="vol-btn" id="btn-vol-down">🔉</button>
+                <input type="range" id="volume-slider" min="0" max="100" value="50" class="volume-slider">
+                <button class="vol-btn" id="btn-vol-up">🔊</button>
+                <span id="volume-value" class="volume-value">50%</span>
+            </div>
+
+            <div class="sleep-timer">
+                <label>슬립 타이머:</label>
+                <select id="sleep-select">
+                    <option value="0">끄기</option>
+                    <option value="15">15분</option>
+                    <option value="30">30분</option>
+                    <option value="60">1시간</option>
+                    <option value="120">2시간</option>
+                </select>
+                <span id="sleep-remaining"></span>
+            </div>
+        </section>
+
+        <!-- 채널 탭 -->
+        <section id="tab-channels" class="tab-content">
+            <div class="channel-list" id="channel-list"></div>
+            <div class="channel-add">
+                <h3>채널 추가</h3>
+                <input type="text" id="add-name" placeholder="채널 이름">
+                <input type="text" id="add-id" placeholder="YouTube Music 재생목록 ID">
+                <select id="add-type">
+                    <option value="playlist">재생목록</option>
+                    <option value="radio">라디오 (자동재생)</option>
+                    <option value="track">단일 트랙</option>
+                </select>
+                <button class="btn-add" id="btn-add-channel">추가</button>
+            </div>
+        </section>
+
+        <!-- 검색 탭 -->
+        <section id="tab-search" class="tab-content">
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="YouTube Music 검색...">
+                <select id="search-type">
+                    <option value="songs">곡</option>
+                    <option value="playlists">재생목록</option>
+                    <option value="podcasts">팟캐스트</option>
+                    <option value="albums">앨범</option>
+                    <option value="artists">아티스트</option>
+                </select>
+                <button class="btn-search" id="btn-search">검색</button>
+            </div>
+            <div class="search-results" id="search-results"></div>
+        </section>
+
+        <!-- 알람 탭 -->
+        <section id="tab-alarm" class="tab-content">
+            <div class="alarm-list" id="alarm-list"></div>
+            <div class="alarm-add">
+                <h3>알람 추가</h3>
+                <div class="alarm-time-input">
+                    <input type="number" id="alarm-hour" min="0" max="23" value="7" placeholder="시">
+                    <span>:</span>
+                    <input type="number" id="alarm-minute" min="0" max="59" value="0" placeholder="분">
+                </div>
+                <div class="alarm-days">
+                    <label><input type="checkbox" value="0"> 월</label>
+                    <label><input type="checkbox" value="1"> 화</label>
+                    <label><input type="checkbox" value="2"> 수</label>
+                    <label><input type="checkbox" value="3"> 목</label>
+                    <label><input type="checkbox" value="4"> 금</label>
+                    <label><input type="checkbox" value="5"> 토</label>
+                    <label><input type="checkbox" value="6"> 일</label>
+                </div>
+                <input type="text" id="alarm-label" placeholder="알람 이름 (선택)">
+                <button class="btn-add" id="btn-add-alarm">알람 추가</button>
+            </div>
+        </section>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

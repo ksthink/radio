@@ -1,0 +1,14 @@
+# /boot/firmware/config.txt 에 추가할 내용
+# Pirate Audio Speaker HAT 설정
+
+# HiFiBerry DAC 활성화
+dtoverlay=hifiberry-dac
+
+# DAC 출력 핀 활성화
+gpio=25=op,dh
+
+# SPI 활성화 (디스플레이용)
+dtparam=spi=on
+
+# 온보드 오디오 비활성화 (선택사항)
+dtparam=audio=off

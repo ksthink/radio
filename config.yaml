@@ -1,0 +1,78 @@
+# PiRadio - 네트워크 라디오 설정
+# Raspberry Pi Zero 2 W + Pirate Audio Speaker
+
+# MPD 설정
+mpd:
+  host: "localhost"
+  port: 6600
+
+# YouTube Music 설정
+youtube:
+  # 품질: "best", "worst", "bestaudio"
+  quality: "bestaudio"
+  # 미리 버퍼링할 트랙 수
+  buffer_tracks: 3
+  # 스트림 URL 갱신 간격 (초)
+  url_refresh_interval: 3000
+
+# 디스플레이 설정
+display:
+  # ST7789 SPI 설정
+  spi_port: 0
+  spi_cs: 1
+  spi_dc: 9
+  backlight: 13
+  rotation: 90
+  width: 240
+  height: 240
+  # 밝기 (0-100)
+  brightness: 80
+  # 화면 자동 꺼짐 (초, 0=비활성)
+  screen_timeout: 300
+  # 폰트 설정
+  font_path: "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf"
+  font_fallback: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+# 버튼 GPIO 핀 (BCM 번호)
+buttons:
+  a: 5      # 재생/일시정지
+  b: 6      # 볼륨 다운 / 길게 누르면 이전 채널
+  x: 16     # 다음 채널
+  y: 24     # 볼륨 업 / 길게 누르면 메뉴
+  long_press_ms: 800
+  debounce_ms: 250
+
+# 볼륨 설정
+volume:
+  default: 50
+  step: 5
+  max: 100
+  min: 0
+
+# 웹 서버 설정
+web:
+  host: "0.0.0.0"
+  port: 8080
+
+# 날씨 설정 (OpenWeatherMap)
+weather:
+  enabled: true
+  api_key: ""  # https://openweathermap.org/api 에서 발급
+  city: "Seoul"
+  units: "metric"
+  update_interval: 1800  # 30분
+
+# 알람 설정
+alarm:
+  enabled: true
+  # 알람 데이터 저장 경로
+  data_file: "data/alarms.json"
+
+# 즐겨찾기 저장 경로
+favorites:
+  data_file: "data/favorites.json"
+
+# 로깅
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/piradio.log"

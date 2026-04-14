@@ -1,0 +1,27 @@
+[Unit]
+Description=PiRadio - 네트워크 라디오
+After=network-online.target mpd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/radio
+ExecStart=/home/pi/.virtualenvs/piradio/bin/python -m app.main
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# 환경변수
+Environment=PYTHONUNBUFFERED=1
+
+# 보안 설정
+ProtectSystem=strict
+ReadWritePaths=/home/pi/radio/data /home/pi/radio/logs
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
