@@ -3,23 +3,24 @@ Description=PiRadio - 네트워크 라디오
 After=network-online.target mpd.service
 Wants=network-online.target
 
+# setup.sh가 실제 경로로 생성하므로 이 파일은 템플릿입니다.
+# 수동 설치 시 아래 경로를 환경에 맞게 수정하세요.
+
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/radio
-ExecStart=/home/pi/.virtualenvs/piradio/bin/python -m app.main
+User=%USER%
+Group=%USER%
+WorkingDirectory=%HOME%/radio
+ExecStart=%HOME%/.virtualenvs/piradio/bin/python -m app.main
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
-# 환경변수
 Environment=PYTHONUNBUFFERED=1
 
-# 보안 설정
 ProtectSystem=strict
-ReadWritePaths=/home/pi/radio/data /home/pi/radio/logs
+ReadWritePaths=%HOME%/radio/data %HOME%/radio/logs
 PrivateTmp=true
 NoNewPrivileges=true
 

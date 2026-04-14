@@ -30,7 +30,7 @@ SSH와 Wi-Fi 미리 설정.
 
 ### 2. PiRadio 설치
 ```bash
-git clone <이 저장소> ~/radio
+git clone https://github.com/ksthink/radio.git ~/radio
 cd ~/radio
 chmod +x setup.sh
 ./setup.sh
