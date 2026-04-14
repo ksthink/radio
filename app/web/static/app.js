@@ -106,10 +106,10 @@
                     <button class="ch-del" data-id="${i}" title="삭제">✕</button>
                 </div>
             `;
-            div.querySelector(".channel-item,.ch-info").onclick = () => api("/api/channel/select", { index: i });
+            div.querySelector(".ch-info").onclick = () => post(`/api/channels/${i}/play`);
             div.querySelector(".ch-del").onclick = (e) => {
                 e.stopPropagation();
-                api("/api/channel/remove", { index: i }).then(() => loadChannels());
+                fetch(`/api/channels/${i}`, { method: "DELETE" }).then(() => loadChannels());
             };
             list.appendChild(div);
         });
@@ -156,7 +156,7 @@
             return;
         }
 
-        const res = await post("/api/channel/add", {
+        const res = await post("/api/channels", {
             name: name,
             id: id,
             type: type
@@ -240,24 +240,54 @@
 
     // ─── YOUTUBE LIBRARY ───
     async function loadYouTubeLibrary() {
-        const data = await api("/api/youtube/library");
-        if (!data || !data.playlists) return;
+        try {
+            console.log("📚 YouTube 라이브러리 로드 중...");
+            const data = await api("/api/youtube/library");
+            
+            if (!data) {
+                console.error("❌ 라이브러리 API 응답 없음");
+                return;
+            }
+            
+            if (data.error) {
+                console.error("❌ 라이브러리 오류:", data.error);
+                return;
+            }
+            
+            const playlists = data.playlists || [];
+            console.log(`✓ ${playlists.length}개 플레이리스트 발견`);
+            
+            if (playlists.length === 0) {
+                console.warn("⚠️  플레이리스트가 없습니다");
+                return;
+            }
 
-        const playlists = data.playlists || [];
-        if (playlists.length === 0) return;
+            // Auto-add first 3 playlists (or configure as needed)
+            let addedCount = 0;
+            for (let i = 0; i < Math.min(playlists.length, 3); i++) {
+                const pl = playlists[i];
+                console.log(`  → 추가 중: "${pl.title}" (${pl.id})`);
+                
+                const res = await post("/api/channels", {
+                    name: pl.title,
+                    id: pl.id,
+                    type: "playlist",
+                    description: pl.description || pl.title
+                });
+                
+                if (res && res.ok) {
+                    addedCount++;
+                    console.log(`  ✓ 추가됨: "${pl.title}"`);
+                } else {
+                    console.warn(`  ❌ 실패: "${pl.title}"`, res);
+                }
+            }
 
-        // Auto-add first 3 playlists (or configure as needed)
-        for (let i = 0; i < Math.min(playlists.length, 3); i++) {
-            const pl = playlists[i];
-            await post("/api/channel/add", {
-                name: pl.title,
-                id: pl.id,
-                type: "playlist",
-                description: pl.description || pl.title  // 설명도 함께 전송
-            });
+            console.log(`✓ ${addedCount}개 채널 추가 완료`);
+            await loadChannels();
+        } catch (e) {
+            console.error("❌ YouTube 라이브러리 로드 오류:", e);
         }
-
-        loadChannels();
     }
 
     // ─── TABS ───
