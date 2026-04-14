@@ -35,6 +35,16 @@
         });
     }
 
+    async function del(path) {
+        try {
+            const resp = await fetch(API + path, { method: "DELETE" });
+            return await resp.json();
+        } catch (e) {
+            console.error("DELETE 오류:", path, e);
+            return null;
+        }
+    }
+
     // ─── STATUS UPDATE ───
     function updateStatus(data) {
         if (!data) return;
@@ -87,30 +97,33 @@
         if (data) updateStatus(data);
     }
 
-    // ─── CHANNELS ───
-    async function loadChannels() {
-        const data = await api("/api/channels");
-        if (!data) return;
-        const list = $("#channel-list");
+    // ─── PLAYLISTS ───
+    async function loadPlaylists() {
+        const data = await api("/api/playlists");
+        if (!data || !data.playlists) return;
+        
+        const list = $("#playlists-list");
         list.innerHTML = "";
-        (data.channels || []).forEach(function (ch, i) {
-            const active = i === data.current ? " active" : "";
+        
+        (data.playlists || []).forEach(function (pl) {
             const div = document.createElement("div");
-            div.className = "channel-item" + active;
+            div.className = "playlist-item";
             div.innerHTML = `
-                <div class="ch-info">
-                    <div class="ch-name">${escapeHtml(ch.name)}</div>
-                    <div class="ch-desc">${escapeHtml(ch.description || ch.type || "")}</div>
+                <div class="pl-info">
+                    <div class="pl-name">${escapeHtml(pl.title)}</div>
+                    <div class="pl-url">${escapeHtml(pl.url)}</div>
                 </div>
-                <div class="ch-actions">
-                    <button class="ch-del" data-id="${i}" title="삭제">✕</button>
+                <div class="pl-actions">
+                    <button class="pl-del" data-id="${pl.id}" title="삭제">✕</button>
                 </div>
             `;
-            div.querySelector(".ch-info").onclick = () => post(`/api/channels/${i}/play`);
-            div.querySelector(".ch-del").onclick = (e) => {
+            
+            div.querySelector(".pl-info").onclick = () => playPlaylist(pl.url);
+            div.querySelector(".pl-del").onclick = (e) => {
                 e.stopPropagation();
-                fetch(`/api/channels/${i}`, { method: "DELETE" }).then(() => loadChannels());
+                deletePlaylist(pl.id);
             };
+            
             list.appendChild(div);
         });
     }
@@ -118,6 +131,53 @@
     function escapeHtml(text) {
         const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
         return String(text).replace(/[&<>"']/g, (m) => map[m]);
+    }
+
+    async function playPlaylist(url) {
+        try {
+            const res = await post("/api/play-url", { url: url });
+            if (res && res.ok) {
+                setTimeout(() => refreshStatus(), 500);
+            } else {
+                alert("❌ " + (res ? res.message : "재생 실패"));
+            }
+        } catch (e) {
+            alert("❌ 오류: " + e.message);
+        }
+    }
+
+    async function addPlaylist() {
+        const title = document.getElementById("playlist-title").value.trim();
+        const url = document.getElementById("playlist-url").value.trim();
+
+        if (!title || !url) {
+            alert("제목과 URL을 입력하세요");
+            return;
+        }
+
+        const res = await post("/api/playlists", {
+            title: title,
+            url: url
+        });
+
+        if (res && res.ok) {
+            document.getElementById("playlist-title").value = "";
+            document.getElementById("playlist-url").value = "";
+            loadPlaylists();
+        } else {
+            alert("❌ " + (res ? res.message : "저장 실패"));
+        }
+    }
+
+    async function deletePlaylist(playlistId) {
+        if (!confirm("이 재생목록을 삭제하시겠습니까?")) return;
+        
+        const res = await del(`/api/playlists/${playlistId}`);
+        if (res && res.ok) {
+            loadPlaylists();
+        } else {
+            alert("❌ " + (res ? res.message : "삭제 실패"));
+        }
     }
 
     // ─── PLAYER CONTROLS ───
@@ -145,150 +205,8 @@
         }
     }
 
-    // ─── ADD CHANNEL ───
-    async function addChannel() {
-        const name = document.getElementById("add-name").value.trim();
-        const id = document.getElementById("add-id").value.trim();
-        const type = document.getElementById("add-type").value;
-
-        if (!name || !id) {
-            alert("채널 이름과 ID를 입력하세요.");
-            return;
-        }
-
-        const res = await post("/api/channels", {
-            name: name,
-            id: id,
-            type: type
-        });
-
-        if (res && res.ok) {
-            document.getElementById("add-name").value = "";
-            document.getElementById("add-id").value = "";
-            loadChannels();
-        } else {
-            alert("❌ " + (res ? res.message : "추가 실패"));
-        }
-    }
-
-    // ─── LOGIN MODAL ───
-    function setupLoginModal() {
-        const modal = $("#login-modal");
-        const loginBtn = $("#btn-login-header");
-        const closeBtn = $("#btn-close-login");
-        const doLoginBtn = $("#btn-do-login");
-        const headersInput = $("#login-headers");
-
-        loginBtn.onclick = () => {
-            modal.style.display = "flex";
-            headersInput.focus();
-        };
-
-        closeBtn.onclick = () => {
-            modal.style.display = "none";
-        };
-
-        modal.onclick = (e) => {
-            if (e.target === modal) modal.style.display = "none";
-        };
-
-        doLoginBtn.onclick = async () => {
-            const headers = headersInput.value.trim();
-            if (!headers) {
-                alert("JSON을 붙여넣으세요.");
-                return;
-            }
-
-            doLoginBtn.disabled = true;
-            doLoginBtn.textContent = "로그인 중...";
-            const status = $("#login-status");
-
-            try {
-                const result = await post("/api/youtube/auth", {
-                    action: "login",
-                    headers: headers
-                });
-
-                if (result && result.ok) {
-                    status.className = "login-status success";
-                    status.textContent = "✅ 로그인 성공!";
-                    headersInput.value = "";
-                    
-                    setTimeout(() => {
-                        modal.style.display = "none";
-                        loadYouTubeLibrary();
-                    }, 1000);
-                } else {
-                    status.className = "login-status error";
-                    status.textContent = "❌ " + (result ? result.message : "로그인 실패");
-                }
-            } catch (e) {
-                status.className = "login-status error";
-                status.textContent = "❌ 오류: " + e.message;
-            }
-
-            doLoginBtn.disabled = false;
-            doLoginBtn.textContent = "로그인";
-        };
-
-        headersInput.onkeypress = (e) => {
-            if (e.key === "Enter" && e.ctrlKey) {
-                doLoginBtn.click();
-            }
-        };
-    }
-
-    // ─── YOUTUBE LIBRARY ───
-    async function loadYouTubeLibrary() {
-        try {
-            console.log("📚 YouTube 라이브러리 로드 중...");
-            const data = await api("/api/youtube/library");
-            
-            if (!data) {
-                console.error("❌ 라이브러리 API 응답 없음");
-                return;
-            }
-            
-            if (data.error) {
-                console.error("❌ 라이브러리 오류:", data.error);
-                return;
-            }
-            
-            const playlists = data.playlists || [];
-            console.log(`✓ ${playlists.length}개 플레이리스트 발견`);
-            
-            if (playlists.length === 0) {
-                console.warn("⚠️  플레이리스트가 없습니다");
-                return;
-            }
-
-            // Auto-add first 3 playlists (or configure as needed)
-            let addedCount = 0;
-            for (let i = 0; i < Math.min(playlists.length, 3); i++) {
-                const pl = playlists[i];
-                console.log(`  → 추가 중: "${pl.title}" (${pl.id})`);
-                
-                const res = await post("/api/channels", {
-                    name: pl.title,
-                    id: pl.id,
-                    type: "playlist",
-                    description: pl.description || pl.title
-                });
-                
-                if (res && res.ok) {
-                    addedCount++;
-                    console.log(`  ✓ 추가됨: "${pl.title}"`);
-                } else {
-                    console.warn(`  ❌ 실패: "${pl.title}"`, res);
-                }
-            }
-
-            console.log(`✓ ${addedCount}개 채널 추가 완료`);
-            await loadChannels();
-        } catch (e) {
-            console.error("❌ YouTube 라이브러리 로드 오류:", e);
-        }
-    }
+    // ─── LOGIN MODAL & YOUTUBE (REMOVED) ───
+    // Login and YouTube library loading removed - using URL-based playback instead
 
     // ─── TABS ───
     function setupTabs() {
@@ -334,49 +252,56 @@
     function init() {
         setupTabs();
         setupControls();
-        setupLoginModal();
 
-        // Channel add button
-        document.getElementById("btn-add-channel").onclick = addChannel;
+        // Playlist add button
+        const btnAddPlaylist = document.getElementById("btn-add-playlist");
+        if (btnAddPlaylist) {
+            btnAddPlaylist.onclick = addPlaylist;
+        }
 
-        // URL play button
-        document.getElementById("btn-play-url").onclick = async () => {
-            const url = document.getElementById("playlist-url").value.trim();
-            if (!url) {
-                alert("URL을 입력하세요");
-                return;
-            }
-
-            const btn = document.getElementById("btn-play-url");
-            btn.disabled = true;
-            btn.textContent = "재생 중...";
-
-            try {
-                const res = await post("/api/play-url", { url: url });
-                if (res && res.ok) {
-                    document.getElementById("playlist-url").value = "";
-                    setTimeout(() => refreshStatus(), 500);
-                } else {
-                    alert("❌ " + (res ? res.message : "재생 실패"));
+        // URL play button (in player tab)
+        const btnPlayUrl = document.getElementById("btn-play-url");
+        if (btnPlayUrl) {
+            btnPlayUrl.onclick = async () => {
+                const url = document.getElementById("playlist-url-input")?.value.trim() || "";
+                if (!url) {
+                    alert("URL을 입력하세요");
+                    return;
                 }
-            } catch (e) {
-                alert("❌ 오류: " + e.message);
-            }
 
-            btn.disabled = false;
-            btn.textContent = "🎵 재생";
-        };
+                btnPlayUrl.disabled = true;
+                btnPlayUrl.textContent = "재생 중...";
+
+                try {
+                    const res = await post("/api/play-url", { url: url });
+                    if (res && res.ok) {
+                        document.getElementById("playlist-url-input").value = "";
+                        setTimeout(() => refreshStatus(), 500);
+                    } else {
+                        alert("❌ " + (res ? res.message : "재생 실패"));
+                    }
+                } catch (e) {
+                    alert("❌ 오류: " + e.message);
+                }
+
+                btnPlayUrl.disabled = false;
+                btnPlayUrl.textContent = "🎵 재생";
+            };
+        }
 
         // Enter key in URL input
-        document.getElementById("playlist-url").addEventListener("keypress", (e) => {
-            if (e.key === "Enter") {
-                document.getElementById("btn-play-url").click();
-            }
-        });
+        const urlInput = document.getElementById("playlist-url-input");
+        if (urlInput) {
+            urlInput.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    btnPlayUrl?.click();
+                }
+            });
+        }
 
         // Load initial data
         refreshStatus();
-        loadChannels();
+        loadPlaylists();
 
         // Poll for updates
         pollTimer = setInterval(refreshStatus, 2000);

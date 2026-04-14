@@ -12,13 +12,12 @@
         <!-- 헤더 -->
         <header class="header">
             <h1>📻 PiRadio</h1>
-            <button class="header-btn" id="btn-login-header" title="YouTube 로그인">🔐</button>
         </header>
 
         <!-- 탭 네비게이션 -->
         <nav class="tabs">
             <button class="tab active" data-tab="player">재생</button>
-            <button class="tab" data-tab="channels">채널</button>
+            <button class="tab" data-tab="playlists">재생목록</button>
         </nav>
 
         <!-- 재생 탭 -->
@@ -68,41 +67,21 @@
             </div>
 
             <div class="url-input-section">
-                <input type="text" id="playlist-url" placeholder="YouTube 플레이리스트 또는 곡 URL" class="playlist-url-input">
+                <input type="text" id="playlist-url-input" placeholder="YouTube 플레이리스트 또는 곡 URL" class="playlist-url-input">
                 <button id="btn-play-url" class="btn-play-url">🎵 재생</button>
             </div>
         </section>
 
         <!-- 채널 탭 -->
-        <section id="tab-channels" class="tab-content">
-            <div class="channel-list" id="channel-list"></div>
-            <div class="channel-add">
-                <h3>채널 추가</h3>
-                <input type="text" id="add-name" placeholder="채널 이름">
-                <input type="text" id="add-id" placeholder="YouTube Music 재생목록 ID">
-                <select id="add-type">
-                    <option value="playlist">재생목록</option>
-                    <option value="radio">라디오</option>
-                </select>
-                <button class="btn-add" id="btn-add-channel">추가</button>
+        <section id="tab-playlists" class="tab-content">
+            <div class="playlists-list" id="playlists-list"></div>
+            <div class="playlist-add">
+                <h3>📚 재생목록 추가</h3>
+                <input type="text" id="playlist-title" placeholder="재생목록 이름" class="playlist-input">
+                <input type="text" id="playlist-url" placeholder="YouTube 플레이리스트 URL" class="playlist-input">
+                <button class="btn-add" id="btn-add-playlist">추가</button>
             </div>
         </section>
-    </div>
-
-    <!-- 로그인 모달 -->
-    <div id="login-modal" class="modal" style="display:none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>YouTube 로그인</h2>
-                <button class="modal-close" id="btn-close-login">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>로컬 PC에서 <code>python3 get_youtube_headers.py</code> 실행 후 JSON을 붙여넣으세요.</p>
-                <textarea id="login-headers" class="login-headers-input" placeholder='{"Authorization": "SAPISIDHASH ...", "User-Agent": "Mozilla/5.0 ..."}' rows="5"></textarea>
-                <button class="btn-primary" id="btn-do-login" style="width:100%; margin-top:10px;">로그인</button>
-                <div id="login-status" class="login-status"></div>
-            </div>
-        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>

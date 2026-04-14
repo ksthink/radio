@@ -4,6 +4,7 @@ import logging
 import os
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
+from app.playlists import PlaylistManager
 
 logger = logging.getLogger(__name__)
 
@@ -15,12 +16,14 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 # 전역 참조 (main에서 주입)
 _radio = None
+_playlists = None
 
 
 def init_web(radio_app):
     """웹 서버에 라디오 앱 참조를 주입한다."""
-    global _radio
+    global _radio, _playlists
     _radio = radio_app
+    _playlists = PlaylistManager(data_dir=os.path.dirname(os.path.dirname(os.path.dirname(__file__))) + "/data")
 
 
 # ─────────── 페이지 라우트 ───────────
@@ -215,6 +218,56 @@ def api_channel_delete(index):
     if _radio.favorites.remove_channel(index):
         return jsonify({"ok": True})
     return jsonify({"error": "잘못된 인덱스"}), 404
+
+
+# ─────────── 재생목록 API ───────────
+
+@app.route("/api/playlists")
+def api_playlists():
+    """저장된 재생목록 목록."""
+    if not _playlists:
+        return jsonify({"error": "재생목록 미초기화"}), 503
+    try:
+        return jsonify({
+            "playlists": _playlists.get_playlists(),
+        })
+    except Exception as e:
+        logger.error("재생목록 조회 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/playlists", methods=["POST"])
+def api_playlist_add():
+    """재생목록 추가."""
+    if not _playlists:
+        return jsonify({"error": "재생목록 미초기화"}), 503
+    try:
+        data = request.get_json(silent=True) or {}
+        title = data.get("title", "").strip()
+        url = data.get("url", "").strip()
+        
+        if not title or not url:
+            return jsonify({"error": "제목과 URL이 필요합니다"}), 400
+        
+        playlist = _playlists.add_playlist(title, url)
+        return jsonify({"ok": True, "playlist": playlist})
+    except Exception as e:
+        logger.error("재생목록 추가 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/playlists/<int:playlist_id>", methods=["DELETE"])
+def api_playlist_delete(playlist_id):
+    """재생목록 삭제."""
+    if not _playlists:
+        return jsonify({"error": "재생목록 미초기화"}), 503
+    try:
+        if _playlists.remove_playlist(playlist_id):
+            return jsonify({"ok": True})
+        return jsonify({"error": "재생목록을 찾을 수 없습니다"}), 404
+    except Exception as e:
+        logger.error("재생목록 삭제 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 # ─────────── 검색 API ───────────
