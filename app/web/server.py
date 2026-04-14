@@ -309,6 +309,85 @@ def api_alarm_toggle(alarm_id):
     return jsonify({"ok": True, "enabled": enabled})
 
 
+@app.route("/api/youtube/auth", methods=["POST"])
+def api_youtube_auth():
+    """YouTube 브라우저 인증 시작."""
+    if not _radio:
+        return jsonify({"error": "초기화 중"}), 503
+    try:
+        action = request.get_json(silent=True).get("action", "")
+        
+        if action == "login":
+            # 브라우저 인증 시작
+            logger.info("YouTube 브라우저 인증 시작...")
+            success = _radio.yt_player.authenticate_browser()
+            if success:
+                return jsonify({
+                    "ok": True,
+                    "message": "YouTube 로그인 성공! (브라우저 이용)",
+                    "authenticated": True
+                })
+            else:
+                return jsonify({
+                    "ok": False,
+                    "message": "YouTube 로그인 실패",
+                    "authenticated": False
+                }), 500
+        
+        elif action == "check":
+            # 인증 상태 확인
+            is_auth = _radio.yt_player.is_authenticated()
+            return jsonify({
+                "authenticated": is_auth,
+                "message": "로그인됨" if is_auth else "로그인 필요"
+            })
+        
+        else:
+            return jsonify({"error": "알 수 없는 action"}), 400
+    
+    except Exception as e:
+        logger.error("YouTube 인증 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/buttons/diagnose")
+def api_buttons_diagnose():
+    """버튼 진단 정보 반환."""
+    if not _radio or not _radio.buttons:
+        return jsonify({"error": "버튼 미초기화"}), 503
+    try:
+        diagnosis = _radio.buttons.diagnose()
+        return jsonify(diagnosis)
+    except Exception as e:
+        logger.error("버튼 진단 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/buttons/test", methods=["POST"])
+def api_buttons_test():
+    """버튼 테스트 (웹 콘솔용)."""
+    if not _radio or not _radio.buttons:
+        return jsonify({"error": "버튼 미초기화"}), 503
+    try:
+        data = request.get_json(silent=True) or {}
+        button = data.get("button", "").lower()
+        long_press = data.get("long", False)
+        
+        if button not in ["a", "b", "x", "y"]:
+            return jsonify({"error": "잘못된 버튼"}), 400
+        
+        _radio.buttons.simulate_press(button, long=long_press)
+        return jsonify({
+            "ok": True,
+            "button": button,
+            "long": long_press,
+            "message": f"버튼 {button.upper()} ({'길게' if long_press else '짧게'}) 테스트 완료"
+        })
+    except Exception as e:
+        logger.error("버튼 테스트 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/sleep", methods=["POST"])
 def api_sleep_timer():
     """슬립 타이머 설정."""

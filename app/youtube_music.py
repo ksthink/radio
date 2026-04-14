@@ -1,4 +1,4 @@
-"""YouTube Music 통합 모듈 - yt-dlp + ytmusicapi"""
+"""YouTube Music 통합 모듈 - yt-dlp + ytmusicapi (로그인 지원, 캐싱, 병렬 처리 최적화)"""
 
 import logging
 import os
@@ -6,7 +6,11 @@ import subprocess
 import sys
 import json
 import threading
-from typing import Optional
+import time
+import hashlib
+from typing import Optional, Dict
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -16,35 +20,152 @@ if not os.path.exists(YT_DLP_BIN):
     YT_DLP_BIN = "yt-dlp"
 
 
-class YouTubeMusicPlayer:
-    """YouTube Music에서 음악을 검색하고 스트림 URL을 추출하는 클래스."""
+class URLCache:
+    """스트림 URL 캐시 (시간 기반, 30분 TTL)."""
+    def __init__(self, cache_dir: str = "data", ttl_seconds: int = 1800):
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(exist_ok=True)
+        self.ttl = ttl_seconds
+        self.memory_cache = {}  # 빠른 접근용 메모리 캐시
+        
+    def _get_cache_key(self, video_id: str) -> str:
+        return hashlib.md5(video_id.encode()).hexdigest()[:8]
+    
+    def get(self, video_id: str) -> Optional[str]:
+        """캐시에서 URL 가져오기."""
+        # 메모리 캐시 확인
+        if video_id in self.memory_cache:
+            url, timestamp = self.memory_cache[video_id]
+            if time.time() - timestamp < self.ttl:
+                return url
+            del self.memory_cache[video_id]
+        
+        # 파일 캐시 확인
+        cache_key = self._get_cache_key(video_id)
+        cache_file = self.cache_dir / f"url_{cache_key}.json"
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r') as f:
+                    data = json.load(f)
+                    if time.time() - data.get('timestamp', 0) < self.ttl:
+                        # 메모리 캐시에도 저장
+                        self.memory_cache[video_id] = (data['url'], data['timestamp'])
+                        return data['url']
+                    cache_file.unlink()  # 만료된 캐시 삭제
+            except Exception as e:
+                logger.warning(f"캐시 로드 실패: {e}")
+        return None
+    
+    def set(self, video_id: str, url: str):
+        """캐시에 URL 저장."""
+        timestamp = time.time()
+        self.memory_cache[video_id] = (url, timestamp)
+        
+        cache_key = self._get_cache_key(video_id)
+        cache_file = self.cache_dir / f"url_{cache_key}.json"
+        try:
+            with open(cache_file, 'w') as f:
+                json.dump({'url': url, 'timestamp': timestamp}, f)
+        except Exception as e:
+            logger.warning(f"캐시 저장 실패: {e}")
+    
+    def clear_expired(self):
+        """만료된 캐시 정리."""
+        current_time = time.time()
+        for cache_file in self.cache_dir.glob("url_*.json"):
+            try:
+                with open(cache_file, 'r') as f:
+                    data = json.load(f)
+                    if current_time - data.get('timestamp', 0) >= self.ttl:
+                        cache_file.unlink()
+            except Exception:
+                pass
 
-    def __init__(self, mpd_controller, quality="bestaudio", buffer_tracks=3):
+
+class YouTubeMusicPlayer:
+    """YouTube Music에서 음악을 검색하고 스트림 URL을 추출하는 클래스 (로그인 지원)."""
+
+    def __init__(self, mpd_controller, quality="bestaudio", buffer_tracks=3, auth_file: str = "data/yt_auth.json"):
         self.mpd = mpd_controller
         self.quality = quality
         self.buffer_tracks = buffer_tracks
+        self.auth_file = Path(auth_file)
         self._ytmusic = None
         self._current_queue = []
         self._current_index = 0
         self._current_channel = None
-        self._current_track = None  # 현재 재생 중인 트랙 정보
+        self._current_track = None
         self._lock = threading.Lock()
-        self._radio_fail_ids = set()  # 라디오 트랙 가져오기 실패한 ID 캐시
+        self._radio_fail_ids = set()
+        self._url_cache = URLCache()
+        self._executor = ThreadPoolExecutor(max_workers=3)  # 병렬 처리용
+        self.auth_file.parent.mkdir(exist_ok=True)
+        logger.info("YouTubeMusicPlayer 초기화 완료 (캐싱, 병렬 처리 활성화)")
+
+    def authenticate_browser(self):
+        """브라우저를 통한 인증 (사용자 상호작용 필요)."""
+        try:
+            from ytmusicapi import YTMusic
+            logger.info("브라우저 인증 시작...")
+            
+            # 브라우저 기반 인증
+            headers = YTMusic.auth.get_headers_from_browser()
+            self.auth_file.write_text(json.dumps(headers))
+            self._ytmusic = YTMusic(auth=str(self.auth_file))
+            logger.info("YouTube 로그인 성공")
+            return True
+        except Exception as e:
+            logger.error(f"브라우저 인증 실패: {e}")
+            return False
+
+    def set_api_key(self, api_key: str):
+        """API 키로 인증 (옵션)."""
+        try:
+            auth_data = {"api_key": api_key}
+            self.auth_file.write_text(json.dumps(auth_data))
+            logger.info("API 키 저장 완료")
+            self._ytmusic = None  # 캐시 초기화
+            return True
+        except Exception as e:
+            logger.error(f"API 키 설정 실패: {e}")
+            return False
+
+    def is_authenticated(self) -> bool:
+        """인증 상태 확인."""
+        return self.auth_file.exists()
 
     def _get_ytmusic(self):
         """ytmusicapi 인스턴스를 반환 (지연 로딩)."""
         if self._ytmusic is None:
             try:
                 from ytmusicapi import YTMusic
-                self._ytmusic = YTMusic()
-                logger.info("YTMusic API 초기화 완료")
+                
+                # 저장된 인증 정보로 로그인
+                if self.auth_file.exists():
+                    try:
+                        self._ytmusic = YTMusic(auth=str(self.auth_file))
+                        logger.info("저장된 인증으로 YTMusic API 초기화")
+                    except Exception as e:
+                        logger.warning(f"저장된 인증 실패, 익명 모드로 전환: {e}")
+                        self._ytmusic = YTMusic()
+                else:
+                    # 비로그인 (제한적 기능)
+                    self._ytmusic = YTMusic()
+                    logger.info("YTMusic API 초기화 (비로그인)")
             except ImportError:
-                logger.error("ytmusicapi가 설치되지 않음: pip install ytmusicapi")
+                logger.error("ytmusicapi 설치 필요: pip install ytmusicapi")
                 raise
         return self._ytmusic
 
-    def extract_stream_url(self, video_id: str) -> Optional[str]:
-        """yt-dlp로 YouTube 영상의 오디오 스트림 URL을 추출한다."""
+    def extract_stream_url(self, video_id: str, use_cache: bool = True) -> Optional[str]:
+        """yt-dlp로 YouTube 영상의 오디오 스트림 URL을 추출한다 (캐싱 적용)."""
+        # 캐시 확인
+        if use_cache:
+            cached_url = self._url_cache.get(video_id)
+            if cached_url:
+                logger.debug(f"캐시된 URL 사용: {video_id}")
+                return cached_url
+        
         url = f"https://music.youtube.com/watch?v={video_id}"
         try:
             result = subprocess.run(
@@ -55,24 +176,29 @@ class YouTubeMusicPlayer:
                     "--get-url",
                     "--no-warnings",
                     "--no-check-certificates",
+                    "--socket-timeout", "15",  # 타임아웃 15초로 단축
                     url,
                 ],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=20,
             )
             if result.returncode == 0 and result.stdout.strip():
                 stream_url = result.stdout.strip().split("\n")[0]
-                logger.debug("스트림 URL 추출 성공: %s", video_id)
+                self._url_cache.set(video_id, stream_url)  # 캐시 저장
+                logger.debug(f"스트림 URL 추출 성공 (캐쉬 저장): {video_id}")
                 return stream_url
             else:
-                logger.error("yt-dlp 실패: %s", result.stderr[:200])
+                logger.warning(f"yt-dlp 추출 실패: {result.stderr[:100]}")
                 return None
         except subprocess.TimeoutExpired:
-            logger.error("yt-dlp 타임아웃: %s", video_id)
+            logger.error(f"yt-dlp 타임아웃: {video_id}")
             return None
         except FileNotFoundError:
-            logger.error("yt-dlp가 설치되지 않음")
+            logger.error("yt-dlp이 설치되지 않음")
+            return None
+        except Exception as e:
+            logger.error(f"URL 추출 오류: {e}")
             return None
 
     def get_video_info(self, video_id: str) -> Optional[dict]:
@@ -256,23 +382,36 @@ class YouTubeMusicPlayer:
             return self._queue_and_play()
 
     def _queue_and_play(self):
-        """현재 큐의 트랙을 MPD에 추가하고 재생한다."""
+        """현재 큐의 트랙을 MPD에 추가하고 재생한다 (병렬 처리)."""
         self.mpd.clear_playlist()
         end = min(self._current_index + self.buffer_tracks, len(self._current_queue))
+        
+        # 병렬로 URL 추출
+        tracks_to_add = self._current_queue[self._current_index:end]
+        futures = {
+            self._executor.submit(self.extract_stream_url, track["id"]): track 
+            for track in tracks_to_add
+        }
+        
+        added_count = 0
+        for future in futures:
+            try:
+                stream_url = future.result(timeout=25)  # 개별 타임아웃
+                if stream_url:
+                    track = futures[future]
+                    self.mpd.add_track(stream_url)
+                    added_count += 1
+            except Exception as e:
+                logger.warning(f"트랙 추가 실패: {e}")
 
-        for i in range(self._current_index, end):
-            track = self._current_queue[i]
-            stream_url = self.extract_stream_url(track["id"])
-            if stream_url:
-                self.mpd.add_track(stream_url)
-
-        if self.mpd.playlist_length() > 0:
+        if added_count > 0:
             self.mpd.play(0)
+            logger.info(f"재생 시작 ({added_count}개 트랙 추가)")
             return True
         return False
 
     def queue_next_tracks(self):
-        """재생 중 다음 트랙들을 미리 큐에 추가한다."""
+        """재생 중 다음 트랙들을 미리 큐에 추가한다 (병렬 처리)."""
         with self._lock:
             if not self._current_queue:
                 return
@@ -298,15 +437,24 @@ class YouTubeMusicPlayer:
                             logger.warning("라디오 트랙 가져오기 실패, 재시도 안 함: %s", last_id)
                             return
 
+                # 병렬로 다음 트랙들 추가
                 end = min(
                     self._current_index + self.buffer_tracks,
                     len(self._current_queue),
                 )
-                for i in range(self._current_index, end):
-                    track = self._current_queue[i]
-                    stream_url = self.extract_stream_url(track["id"])
-                    if stream_url:
-                        self.mpd.add_track(stream_url)
+                tracks_to_add = self._current_queue[self._current_index:end]
+                futures = {
+                    self._executor.submit(self.extract_stream_url, track["id"]): track
+                    for track in tracks_to_add
+                }
+                
+                for future in futures:
+                    try:
+                        stream_url = future.result(timeout=25)
+                        if stream_url:
+                            self.mpd.add_track(stream_url)
+                    except Exception as e:
+                        logger.warning(f"트랙 추가 실패: {e}")
 
     def get_current_track_info(self):
         """현재 재생 중인 트랙의 메타정보."""

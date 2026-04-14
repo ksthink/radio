@@ -55,13 +55,23 @@ class PiRadio:
             port=mpd_cfg.get("port", 6600),
         )
 
-        # YouTube Music Player
+        # YouTube Music Player (캐싱, 로그인 지원)
         yt_cfg = self.config.get("youtube", {})
+        auth_file = yt_cfg.get("auth_file", "data/yt_auth.json")
+        os.makedirs(os.path.dirname(auth_file), exist_ok=True)
+        
         self.yt_player = YouTubeMusicPlayer(
             self.mpd,
             quality=yt_cfg.get("quality", "bestaudio"),
             buffer_tracks=yt_cfg.get("buffer_tracks", 3),
+            auth_file=auth_file,
         )
+        
+        # YouTube 인증 상태 확인 및 로깅
+        if self.yt_player.is_authenticated():
+            logger.info("✓ YouTube 인증 토큰 발견 - 로그인 상태")
+        else:
+            logger.info("⚠️ YouTube 비로그인 - 웹 UI에서 '/api/youtube/auth' 호출로 로그인 가능")
 
         # 즐겨찾기
         fav_cfg = self.config.get("favorites", {})

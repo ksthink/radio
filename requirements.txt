@@ -16,3 +16,7 @@ gevent>=24.2.1
 # gpiozero>=2.0
 # lgpio>=0.2
 # numpy>=1.24.0
+
+# 성능 최적화 라이브러리 (선택사항)
+# cachetools>=5.0.0  # 고급 캐싱
+# aiofiles>=23.0.0   # 비동기 파일 I/O

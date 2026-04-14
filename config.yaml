@@ -6,14 +6,18 @@ mpd:
   host: "localhost"
   port: 6600
 
-# YouTube Music 설정
+# YouTube Music 설정 (로그인 지원, 캐싱, 성능 최적화)
 youtube:
-  # 품질: "best", "worst", "bestaudio"
+  # 품질: "best", "worst", "bestaudio", "worse", "worstaudio"
   quality: "bestaudio"
-  # 미리 버퍼링할 트랙 수
+  # 미리 버퍼링할 트랙 수 (많을수록 네트워크 부하)
   buffer_tracks: 3
-  # 스트림 URL 갱신 간격 (초)
+  # 스트림 URL 갱신 간격 (초) - 유튜브 토큰 만료 대비
   url_refresh_interval: 3000
+  # 인증 정보 저장 경로
+  auth_file: "data/yt_auth.json"
+  # URL 캐시 TTL (초, 기본값: 1800 = 30분)
+  cache_ttl: 1800
 
 # 디스플레이 설정
 display:
@@ -33,13 +37,19 @@ display:
   font_path: "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf"
   font_fallback: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-# 버튼 GPIO 핀 (BCM 번호)
+# 버튼 GPIO 핀 (BCM 번호) - Pirate Audio Speaker
+# ⚠️ 핀 번호가 잘못되면 버튼이 작동하지 않습니다!
+# Pirate Audio 기본값: A=5, B=6, X=16, Y=24
 buttons:
-  a: 5      # 재생/일시정지
-  b: 6      # 볼륨 다운 / 길게 누르면 이전 채널
-  x: 16     # 다음 채널
-  y: 24     # 볼륨 업 / 길게 누르면 메뉴
+  a: 5      # 재생/일시정지 | 길게: 시계 화면
+  b: 6      # 볼륨 다운 | 길게: 이전 채널
+  x: 16     # 다음 채널 | 길게: 채널 목록
+  y: 24     # 볼륨 업 | 길게: 메뉴
+  # 길게 누르기 판정 시간 (밀리초)
+  # 낮을수록 반응성 높음, 높을수록 오류 감소
   long_press_ms: 800
+  # 디바운싱 시간 (밀리초) - GPIO 노이즈 제거
+  # 문제: 버튼이 반응이 없거나 여러 번 인식되면 이 값을 증가시키세요
   debounce_ms: 250
 
 # 볼륨 설정
