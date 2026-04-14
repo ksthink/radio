@@ -263,6 +263,81 @@ JSON 파싱 오류: {e}
                 raise
         return self._ytmusic
 
+    def get_tracks_from_url(self, url: str) -> list:
+        """YouTube 플레이리스트 또는 곡 URL에서 트랙 목록 추출 (yt-dlp 사용)."""
+        try:
+            logger.info(f"URL에서 트랙 추출 중: {url}")
+            
+            # yt-dlp로 플레이리스트/곡 정보 추출
+            cmd = [
+                YT_DLP_BIN,
+                "-j",  # JSON 출력
+                "--flat-playlist",  # 플레이리스트의 모든 항목
+                "--no-warnings",
+                url
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode != 0:
+                logger.error(f"yt-dlp 오류: {result.stderr}")
+                return []
+            
+            tracks = []
+            for line in result.stdout.strip().split('\n'):
+                if not line:
+                    continue
+                try:
+                    item = json.loads(line)
+                    
+                    # 비디오 ID 추출
+                    video_id = item.get('id') or item.get('url', '').split('v=')[-1]
+                    if not video_id:
+                        continue
+                    
+                    track = {
+                        "id": video_id,
+                        "title": item.get('title', '알 수 없음'),
+                        "artist": item.get('uploader', '') or item.get('channel', ''),
+                        "duration": item.get('duration', 0),
+                        "thumbnail": item.get('thumbnail', ''),
+                    }
+                    tracks.append(track)
+                except json.JSONDecodeError:
+                    continue
+            
+            logger.info(f"✓ {len(tracks)}개 트랙 추출 완료")
+            return tracks
+            
+        except subprocess.TimeoutExpired:
+            logger.error("URL 추출 타임아웃")
+            return []
+        except Exception as e:
+            logger.error(f"URL 추출 실패: {e}")
+            return []
+
+    def play_url(self, url: str) -> bool:
+        """YouTube URL의 플레이리스트/곡을 재생합니다."""
+        try:
+            tracks = self.get_tracks_from_url(url)
+            if not tracks:
+                logger.error("URL에서 트랙을 추출할 수 없습니다")
+                return False
+            
+            # 첫 번째 트랙부터 재생 시작
+            with self._lock:
+                self._current_queue = tracks
+                self._current_index = 0
+                self._current_channel = None
+                self._current_track = tracks[0]
+            
+            logger.info(f"URL 재생 시작: {len(tracks)}개 트랙")
+            return self._queue_and_play()
+            
+        except Exception as e:
+            logger.error(f"URL 재생 실패: {e}")
+            return False
+
     def extract_stream_url(self, video_id: str, use_cache: bool = True) -> Optional[str]:
         """yt-dlp로 YouTube 영상의 오디오 스트림 URL을 추출한다 (캐싱 적용)."""
         # 캐시 확인

@@ -474,6 +474,38 @@ def api_youtube_auth():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/play-url", methods=["POST"])
+def api_play_url():
+    """YouTube 플레이리스트 또는 곡 URL 직접 재생."""
+    if not _radio:
+        return jsonify({"error": "초기화 중"}), 503
+    
+    try:
+        data = request.get_json(silent=True) or {}
+        url = data.get("url", "").strip()
+        
+        if not url:
+            return jsonify({"error": "URL이 필요합니다"}), 400
+        
+        # URL에서 트랙 추출 및 재생
+        success = _radio.yt_player.play_url(url)
+        
+        if success:
+            return jsonify({
+                "ok": True,
+                "message": "재생 시작"
+            })
+        else:
+            return jsonify({
+                "ok": False,
+                "message": "URL에서 트랙을 추출할 수 없습니다"
+            }), 400
+    
+    except Exception as e:
+        logger.error("URL 재생 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/buttons/diagnose")
 def api_buttons_diagnose():
     """버튼 진단 정보 반환."""

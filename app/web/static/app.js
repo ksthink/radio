@@ -339,6 +339,41 @@
         // Channel add button
         document.getElementById("btn-add-channel").onclick = addChannel;
 
+        // URL play button
+        document.getElementById("btn-play-url").onclick = async () => {
+            const url = document.getElementById("playlist-url").value.trim();
+            if (!url) {
+                alert("URL을 입력하세요");
+                return;
+            }
+
+            const btn = document.getElementById("btn-play-url");
+            btn.disabled = true;
+            btn.textContent = "재생 중...";
+
+            try {
+                const res = await post("/api/play-url", { url: url });
+                if (res && res.ok) {
+                    document.getElementById("playlist-url").value = "";
+                    setTimeout(() => refreshStatus(), 500);
+                } else {
+                    alert("❌ " + (res ? res.message : "재생 실패"));
+                }
+            } catch (e) {
+                alert("❌ 오류: " + e.message);
+            }
+
+            btn.disabled = false;
+            btn.textContent = "🎵 재생";
+        };
+
+        // Enter key in URL input
+        document.getElementById("playlist-url").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                document.getElementById("btn-play-url").click();
+            }
+        });
+
         // Load initial data
         refreshStatus();
         loadChannels();
