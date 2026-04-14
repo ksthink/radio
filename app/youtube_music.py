@@ -390,55 +390,106 @@ JSON 파싱 오류: {e}
 
     def get_playlist_tracks(self, playlist_id: str):
         """YouTube Music 플레이리스트의 트랙 목록을 가져온다."""
-        yt = self._get_ytmusic()
-        playlist = yt.get_playlist(playlist_id, limit=100)
-        tracks = []
-        for item in playlist.get("tracks", []):
-            video_id = item.get("videoId")
-            if not video_id:
-                continue
-            track = {
-                "id": video_id,
-                "title": item.get("title", "알 수 없음"),
-                "artist": "",
-                "duration": item.get("duration", ""),
-            }
-            artists = item.get("artists", [])
-            if artists:
-                track["artist"] = ", ".join(a.get("name", "") for a in artists if a)
-            thumbnail = item.get("thumbnails", [{}])
-            track["thumbnail"] = thumbnail[-1].get("url", "") if thumbnail else ""
-            tracks.append(track)
-        return tracks
+        try:
+            yt = self._get_ytmusic()
+            playlist = yt.get_playlist(playlist_id, limit=100)
+            tracks = []
+            
+            for item in playlist.get("tracks", []):
+                video_id = item.get("videoId")
+                if not video_id:
+                    continue
+                
+                # 트랙 기본 정보
+                track = {
+                    "id": video_id,
+                    "title": item.get("title", "알 수 없음"),
+                    "artist": "",
+                    "duration": item.get("duration", ""),
+                    "thumbnail": "",
+                }
+                
+                # 아티스트 정보 (여러 형식 지원)
+                artists = item.get("artists", [])
+                if artists and isinstance(artists, list):
+                    artist_names = []
+                    for a in artists:
+                        if isinstance(a, dict):
+                            name = a.get("name", "")
+                        else:
+                            name = str(a)
+                        if name:
+                            artist_names.append(name)
+                    if artist_names:
+                        track["artist"] = ", ".join(artist_names)
+                
+                # 썸네일 정보 (가장 큰 해상도 선택)
+                thumbnails = item.get("thumbnails", [])
+                if thumbnails and isinstance(thumbnails, list) and len(thumbnails) > 0:
+                    # 가장 마지막(가장 큰) 썸네일
+                    thumb = thumbnails[-1]
+                    if isinstance(thumb, dict):
+                        track["thumbnail"] = thumb.get("url", "")
+                
+                tracks.append(track)
+                logger.debug("✓ 트랙: %s - %s", track["title"], track["artist"])
+            
+            logger.info("플레이리스트에서 %d개 트랙 로드: %s", len(tracks), playlist_id)
+            return tracks
+            
+        except Exception as e:
+            logger.error("플레이리스트 트랙 로드 실패 (%s): %s", playlist_id, e)
+            return []
 
     def get_radio_tracks(self, video_id: str):
         """특정 곡 기반으로 라디오(자동 재생) 트랙을 가져온다."""
-        yt = self._get_ytmusic()
         try:
+            yt = self._get_ytmusic()
             watch = yt.get_watch_playlist(videoId=video_id, limit=25)
             tracks = []
+            
             for item in watch.get("tracks", []):
                 vid = item.get("videoId")
                 if not vid:
                     continue
+                
+                # 트랙 기본 정보
                 track = {
                     "id": vid,
                     "title": item.get("title", "알 수 없음"),
                     "artist": "",
                     "duration": item.get("length", ""),
+                    "thumbnail": "",
                 }
+                
+                # 아티스트 정보
                 artists = item.get("artists", [])
-                if artists:
-                    track["artist"] = ", ".join(a.get("name", "") for a in artists if a)
-                thumbnail = item.get("thumbnail", [{}])
-                if isinstance(thumbnail, list):
-                    track["thumbnail"] = thumbnail[-1].get("url", "") if thumbnail else ""
-                else:
-                    track["thumbnail"] = ""
+                if artists and isinstance(artists, list):
+                    artist_names = []
+                    for a in artists:
+                        if isinstance(a, dict):
+                            name = a.get("name", "")
+                        else:
+                            name = str(a)
+                        if name:
+                            artist_names.append(name)
+                    if artist_names:
+                        track["artist"] = ", ".join(artist_names)
+                
+                # 썸네일 정보
+                thumbnails = item.get("thumbnail", item.get("thumbnails", []))
+                if thumbnails and isinstance(thumbnails, list) and len(thumbnails) > 0:
+                    thumb = thumbnails[-1]
+                    if isinstance(thumb, dict):
+                        track["thumbnail"] = thumb.get("url", "")
+                
                 tracks.append(track)
+            
+            logger.info("라디오에서 %d개 트랙 로드: %s", len(tracks), video_id)
             return tracks
+            
         except Exception as e:
-            logger.error("라디오 트랙 가져오기 실패: %s", e)
+            logger.error("라디오 트랙 로드 실패 (%s): %s", video_id, e)
             return []
 
     def play_track(self, video_id: str, title: str = "", artist: str = "", thumbnail: str = ""):
@@ -563,15 +614,43 @@ JSON 파싱 오류: {e}
                         logger.warning(f"트랙 추가 실패: {e}")
 
     def get_current_track_info(self):
-        """현재 재생 중인 트랙의 메타정보."""
-        return self._current_track
+        """현재 재생 중인 트랙의 메타정보 (MPD 위치 기반 동적 업데이트)."""
+        with self._lock:
+            # MPD의 현재 재생 위치 확인
+            status = self.mpd.get_status()
+            current_pos = int(status.get("song", -1))
+            
+            # 큐가 있고 기존 정보도 있으면, 현재 위치의 트랙으로 업데이트
+            if self._current_queue and current_pos >= 0:
+                if current_pos < len(self._current_queue):
+                    self._current_index = current_pos
+                    self._current_track = self._current_queue[current_pos]
+            
+            return self._current_track or {}
 
     def next_track(self):
         """다음 트랙으로 이동."""
         self.mpd.next()
+        
+        # 현재 위치 업데이트
+        status = self.mpd.get_status()
+        current_pos = int(status.get("song", -1))
+        with self._lock:
+            if self._current_queue and current_pos >= 0 and current_pos < len(self._current_queue):
+                self._current_index = current_pos
+                self._current_track = self._current_queue[current_pos]
+        
         # 버퍼 체크를 별도 스레드로
         threading.Thread(target=self.queue_next_tracks, daemon=True).start()
 
     def previous_track(self):
         """이전 트랙으로 이동."""
         self.mpd.previous()
+        
+        # 현재 위치 업데이트
+        status = self.mpd.get_status()
+        current_pos = int(status.get("song", -1))
+        with self._lock:
+            if self._current_queue and current_pos >= 0 and current_pos < len(self._current_queue):
+                self._current_index = current_pos
+                self._current_track = self._current_queue[current_pos]

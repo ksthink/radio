@@ -252,7 +252,8 @@
             await post("/api/channel/add", {
                 name: pl.title,
                 id: pl.id,
-                type: "playlist"
+                type: "playlist",
+                description: pl.description || pl.title  // 설명도 함께 전송
             });
         }
 
