@@ -244,12 +244,66 @@
             alert("✅ YouTube 로그인 성공!");
             $("#youtube-headers").value = "";
             checkYouTubeAuth();
+            loadYouTubeLibrary();
         } else {
             alert("❌ YouTube 로그인 실패\n\n" + (data ? data.message : "알 수 없는 오류"));
         }
         
         btn.disabled = false;
         btn.textContent = "YouTube 로그인";
+    }
+
+    async function loadYouTubeLibrary() {
+        const libraryEl = $("#youtube-library");
+        libraryEl.innerHTML = '<div class="loading">라이브러리 불러오는 중...</div>';
+        
+        const data = await api("/api/youtube/library");
+        
+        if (!data || data.error) {
+            libraryEl.innerHTML = `<div class="status-warning">⚠️ ${data ? data.error : "로드 실패"}</div>`;
+            return;
+        }
+        
+        if (!data.playlists || data.playlists.length === 0) {
+            libraryEl.innerHTML = '<div class="status-warning">📭 저장된 플레이리스트가 없습니다</div>';
+            return;
+        }
+        
+        let html = '<div class="library-list">';
+        html += `<p style="color: var(--text-dim); font-size: 0.85rem;">📚 ${data.count}개 플레이리스트 찾음</p>`;
+        
+        data.playlists.forEach(function (p, idx) {
+            html += `
+                <div class="library-item">
+                    <div class="library-info">
+                        <div class="library-title">${escapeHtml(p.title)}</div>
+                        <div class="library-desc">${escapeHtml(p.description)}</div>
+                    </div>
+                    <button class="library-add" data-index="${idx}" data-id="${p.id}" data-title="${p.title}">➕ 추가</button>
+                </div>`;
+        });
+        
+        html += '</div>';
+        libraryEl.innerHTML = html;
+        
+        // 이벤트 리스너 추가
+        $$(".library-add").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                const plId = this.dataset.id;
+                const plTitle = this.dataset.title;
+                
+                post("/api/channels", {
+                    id: plId,
+                    name: plTitle,
+                    type: "playlist",
+                    description: "YouTube Music 라이브러리"
+                }).then(function () {
+                    loadChannels();
+                    alert("✅ '" + plTitle + "' 채널에 추가됨");
+                    libraryEl.innerHTML = '';  // 추가 후 라이브러리 숨기기
+                });
+            });
+        });
     }
 
     // ─── 버튼 진단 ───
@@ -379,6 +433,7 @@
         checkYouTubeAuth();
         $("#btn-youtube-login").addEventListener("click", loginYouTube);
         $("#btn-youtube-check").addEventListener("click", checkYouTubeAuth);
+        $("#btn-load-library").addEventListener("click", loadYouTubeLibrary);
 
         // 버튼 진단
         $("#btn-diagnose").addEventListener("click", diagnoseButtons);

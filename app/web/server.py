@@ -309,7 +309,123 @@ def api_alarm_toggle(alarm_id):
     return jsonify({"ok": True, "enabled": enabled})
 
 
-@app.route("/api/youtube/auth", methods=["POST"])
+@app.route("/api/youtube/library")
+def api_youtube_library():
+    """사용자의 YouTube Music 라이브러리 플레이리스트 가져오기."""
+    if not _radio:
+        return jsonify({"error": "초기화 중"}), 503
+    
+    try:
+        if not _radio.yt_player.is_authenticated():
+            return jsonify({
+                "error": "YouTube 로그인 필요",
+                "playlists": []
+            }), 401
+        
+        # ytmusicapi 인스턴스 가져오기
+        yt = _radio.yt_player._get_ytmusic()
+        
+        # 사용자의 라이브러리 플레이리스트 가져오기
+        try:
+            playlists = yt.get_library_playlists(limit=50)
+        except Exception as e:
+            logger.warning("라이브러리 플레이리스트 로드 실패: %s", e)
+            playlists = []
+        
+        # 좋아하는 곡 플레이리스트도 추가
+        special_playlists = []
+        try:
+            liked_songs = yt.get_liked_songs(limit=1)
+            if liked_songs.get("tracks") or liked_songs.get("browseId"):
+                special_playlists.append({
+                    "id": liked_songs.get("browseId", "LM"),
+                    "title": "👍 좋아하는 곡",
+                    "description": "저장된 좋아하는 곡 모음",
+                    "type": "playlist"
+                })
+        except Exception as e:
+            logger.debug("좋아하는 곡 로드 실패: %s", e)
+        
+        # 결과 포맷팅
+        result = []
+        
+        # 특수 플레이리스트
+        for p in special_playlists:
+            result.append({
+                "id": p["id"],
+                "title": p["title"],
+                "description": p.get("description", ""),
+                "type": "playlist"
+            })
+        
+        # 일반 플레이리스트
+        for p in (playlists or []):
+            result.append({
+                "id": p.get("playlistId", p.get("browseId", "")),
+                "title": p.get("title", ""),
+                "description": p.get("description", ""),
+                "type": "playlist"
+            })
+        
+        return jsonify({
+            "ok": True,
+            "playlists": result,
+            "count": len(result)
+        })
+    
+    except Exception as e:
+        logger.error("라이브러리 로드 오류: %s", e)
+        return jsonify({"error": str(e), "playlists": []}), 500
+
+
+@app.route("/api/youtube/liked-songs")
+def api_youtube_liked_songs():
+    """사용자의 좋아하는 곡 가져오기."""
+    if not _radio:
+        return jsonify({"error": "초기화 중"}), 503
+    
+    try:
+        if not _radio.yt_player.is_authenticated():
+            return jsonify({
+                "error": "YouTube 로그인 필요",
+                "tracks": []
+            }), 401
+        
+        yt = _radio.yt_player._get_ytmusic()
+        liked_tracks = yt.get_liked_songs(limit=100)
+        
+        tracks = []
+        for item in liked_tracks.get("tracks", []):
+            video_id = item.get("videoId")
+            if not video_id:
+                continue
+            
+            track = {
+                "id": video_id,
+                "title": item.get("title", ""),
+                "artist": "",
+                "duration": item.get("duration", ""),
+                "type": "track"
+            }
+            
+            artists = item.get("artists", [])
+            if artists:
+                track["artist"] = ", ".join(a.get("name", "") for a in artists if a)
+            
+            thumbnail = item.get("thumbnails", [{}])
+            track["thumbnail"] = thumbnail[-1].get("url", "") if thumbnail else ""
+            
+            tracks.append(track)
+        
+        return jsonify({
+            "ok": True,
+            "tracks": tracks,
+            "count": len(tracks)
+        })
+    
+    except Exception as e:
+        logger.error("좋아하는 곡 로드 오류: %s", e)
+        return jsonify({"error": str(e), "tracks": []}), 500
 def api_youtube_auth():
     """YouTube 인증 처리."""
     if not _radio:
