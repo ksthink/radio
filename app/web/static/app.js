@@ -20,6 +20,9 @@
     async function api(path, opts) {
         try {
             const resp = await fetch(API + path, opts);
+            if (!resp.ok) {
+                console.error(`❌ API ERROR ${resp.status}: ${path}`);
+            }
             return await resp.json();
         } catch (e) {
             console.error("API 오류:", path, e);
@@ -94,13 +97,23 @@
 
     async function refreshStatus() {
         const data = await api("/api/status");
-        if (data) updateStatus(data);
+        if (data) {
+            console.log("✓ 상태 갱신:", data);
+            updateStatus(data);
+        } else {
+            console.warn("⚠️  /api/status 응답 없음");
+        }
     }
 
     // ─── PLAYLISTS ───
     async function loadPlaylists() {
         const data = await api("/api/playlists");
-        if (!data || !data.playlists) return;
+        if (!data || !data.playlists) {
+            console.warn("⚠️  /api/playlists 응답 없음");
+            return;
+        }
+        
+        console.log(`✓ 재생목록 로드됨: ${data.playlists.length}개`);
         
         const list = $("#playlists-list");
         list.innerHTML = "";
@@ -194,8 +207,8 @@
             };
         }
 
-        $("#btn-vol-down").onclick = () => post("/api/volume/dec");
-        $("#btn-vol-up").onclick = () => post("/api/volume/inc");
+        $("#btn-vol-down").onclick = () => post("/api/volume/down");
+        $("#btn-vol-up").onclick = () => post("/api/volume/up");
 
         const sleepSelect = document.getElementById("sleep-select");
         if (sleepSelect) {
@@ -223,6 +236,7 @@
 
     // ─── SOCKET IO ───
     function connectSocket() {
+        console.log("🔌 Socket.IO 초기화 중...");
         socket = io("", {
             reconnection: true,
             reconnectionDelay: 1000,
@@ -231,32 +245,41 @@
         });
 
         socket.on("connect", () => {
-            console.log("Socket connected");
+            console.log("✓ Socket 연결됨");
             refreshStatus();
         });
 
         socket.on("status_update", (data) => {
+            console.log("📡 Socket status_update:", data);
             updateStatus(data);
         });
 
-        socket.on("channels_changed", () => {
-            loadChannels();
+        socket.on("disconnect", () => {
+            console.log("❌ Socket 연결 해제");
         });
 
-        socket.on("disconnect", () => {
-            console.log("Socket disconnected");
+        socket.on("error", (err) => {
+            console.error("❌ Socket 에러:", err);
         });
     }
 
     // ─── INIT ───
     function init() {
+        console.log("🚀 PiRadio 초기화 시작");
+        
         setupTabs();
+        console.log("✓ 탭 설정 완료");
+        
         setupControls();
+        console.log("✓ 컨트롤 설정 완료");
 
         // Playlist add button
         const btnAddPlaylist = document.getElementById("btn-add-playlist");
         if (btnAddPlaylist) {
             btnAddPlaylist.onclick = addPlaylist;
+            console.log("✓ 재생목록 추가 버튼 연결");
+        } else {
+            console.warn("⚠️  btn-add-playlist 버튼 없음");
         }
 
         // URL play button (in player tab)
@@ -287,6 +310,9 @@
                 btnPlayUrl.disabled = false;
                 btnPlayUrl.textContent = "🎵 재생";
             };
+            console.log("✓ URL 재생 버튼 연결");
+        } else {
+            console.warn("⚠️  btn-play-url 버튼 없음");
         }
 
         // Enter key in URL input
@@ -300,14 +326,20 @@
         }
 
         // Load initial data
+        console.log("📡 상태 로드 중...");
         refreshStatus();
+        console.log("📦 재생목록 로드 중...");
         loadPlaylists();
 
         // Poll for updates
         pollTimer = setInterval(refreshStatus, 2000);
+        console.log("⏱️  폴링 시작 (2초 간격)");
 
         // Connect socket
         connectSocket();
+        console.log("🔌 Socket.IO 연결 중...");
+        
+        console.log("✅ PiRadio 초기화 완료!");
     }
 
     // Start when DOM is ready
