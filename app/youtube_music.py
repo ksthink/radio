@@ -27,6 +27,7 @@ class YouTubeMusicPlayer:
         self._current_queue = []
         self._current_index = 0
         self._current_channel = None
+        self._current_track = None  # 현재 재생 중인 트랙 정보
         self._lock = threading.Lock()
         self._radio_fail_ids = set()  # 라디오 트랙 가져오기 실패한 ID 캐시
 
@@ -212,16 +213,18 @@ class YouTubeMusicPlayer:
         """단일 트랙을 재생한다."""
         stream_url = self.extract_stream_url(video_id)
         if stream_url:
+            track_info = {
+                "id": video_id,
+                "title": title,
+                "artist": artist,
+                "thumbnail": thumbnail,
+            }
             self.mpd.add_and_play(stream_url)
             with self._lock:
-                self._current_queue = [{
-                    "id": video_id,
-                    "title": title,
-                    "artist": artist,
-                    "thumbnail": thumbnail,
-                }]
+                self._current_queue = [track_info]
                 self._current_index = 0
                 self._current_channel = None
+                self._current_track = track_info
             logger.info("재생 시작: %s (%s)", title, video_id)
             return True
         logger.error("재생 실패: %s", video_id)
@@ -249,6 +252,7 @@ class YouTubeMusicPlayer:
 
             self._current_queue = tracks
             self._current_index = 0
+            self._current_track = tracks[0] if tracks else None
             return self._queue_and_play()
 
     def _queue_and_play(self):
@@ -306,17 +310,7 @@ class YouTubeMusicPlayer:
 
     def get_current_track_info(self):
         """현재 재생 중인 트랙의 메타정보."""
-        if not self._current_queue:
-            return None
-        status = self.mpd.get_status()
-        pos = int(status.get("song", 0))
-        idx = self._current_index - self.buffer_tracks + pos
-        idx = max(0, min(idx, len(self._current_queue) - 1))
-        # 간단한 인덱싱: 첫 재생부터 계산
-        actual_idx = pos  # 플레이리스트 내 위치
-        if actual_idx < len(self._current_queue):
-            return self._current_queue[actual_idx]
-        return self._current_queue[-1] if self._current_queue else None
+        return self._current_track
 
     def next_track(self):
         """다음 트랙으로 이동."""
