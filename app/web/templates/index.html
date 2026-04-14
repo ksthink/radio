@@ -134,16 +134,23 @@
                 <div id="youtube-auth-status" class="auth-status"></div>
                 
                 <div class="youtube-auth-instructions">
-                    <p><strong>설정 방법:</strong></p>
+                    <p><strong>설정 방법 (개발자 도구 사용):</strong></p>
                     <ol>
-                        <li>로컬 PC (Windows/Mac/Linux)에서 다음 명령 실행:
-                            <code>python3 -c "from ytmusicapi import YTMusic; YTMusic.auth.get_headers_from_browser()"</code>
+                        <li><strong>로컬 PC</strong>에서 YouTube Music 웹사이트 방문:
+                            <a href="https://music.youtube.com" target="_blank">https://music.youtube.com</a>
                         </li>
-                        <li>실행 후 <code>~/.config/ytmusicapi/headers_auth.json</code> 파일 열기</li>
-                        <li>파일의 모든 내용 복사</li>
+                        <li>Google 계정으로 로그인</li>
+                        <li>
+                            브라우저 개발자 도구 열기:
+                            <code>Windows/Linux: F12</code> 또는 <code>Mac: Cmd+Option+I</code>
+                        </li>
+                        <li>'Storage' 또는 'Application' 탭 클릭</li>
+                        <li>왼쪽 메뉴에서 'Cookies' → 'music.youtube.com' 선택</li>
+                        <li>'SAPISID' 또는 다른 Cookie 값을 찾아서 복사</li>
                         <li>아래 텍스트박스에 붙여넣기</li>
                         <li>"YouTube 로그인" 버튼 클릭</li>
                     </ol>
+                    <p style="margin-top: 12px; font-size: 0.8rem;"><strong>팁:</strong> 로컬 PC에서 <code>python3 get_youtube_headers.py new</code> 도구를 사용하면 더 쉽습니다!</p>
                 </div>
                 
                 <textarea id="youtube-headers" class="youtube-headers-input" placeholder="{'Access-Control-Allow-Credentials': 'true', ...}" rows="8"></textarea>

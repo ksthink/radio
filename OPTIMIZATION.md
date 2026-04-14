@@ -41,31 +41,34 @@ youtube:
 
 #### 🌐 웹 UI에서 로그인하기
 
-1. **웹 브라우저에서 접속**: `http://라디오IP:8080`
+**로컬 PC에서:**
+```bash
+# 1. headers 생성 도구 실행
+python3 get_youtube_headers.py new
+# → 개발자 도구를 사용해서 Cookie 값 입력
 
-2. **메뉴에서 "YouTube 로그인" 선택**
+# 또는 2. 기존 headers 표시
+python3 get_youtube_headers.py show
+```
 
-3. **브라우저 인증 팝업 대기**
-
-4. **완료 후 자동으로 저장됨**
+**라즈베리파이 웹 UI에서:**
+1. `http://라디오IP:8080` 접속
+2. **설정** 탭 → **YouTube Music 인증** 섹션
+3. 생성된 headers JSON 붙여넣기
+4. **YouTube 로그인** 버튼 클릭
 
 #### API 엔드포인트
 ```bash
-# 로그인 시작
+# 로그인 (headers JSON 필요)
 curl -X POST http://localhost:8080/api/youtube/auth \
   -H "Content-Type: application/json" \
-  -d '{"action": "login"}'
+  -d '{"action": "login", "headers": "{\"Cookie\": \"...\", ...}"}'
 
 # 인증 상태 확인
-curl http://localhost:8080/api/youtube/auth \
+curl -X POST http://localhost:8080/api/youtube/auth \
   -H "Content-Type: application/json" \
   -d '{"action": "check"}'
 ```
-
-#### 토큰 만료 관리
-- 자동 갱신 간격: 3000초 (50분)
-- 만료 시 자동 재인증 시도
-- 실패 시 비로그인 모드로 대체
 
 ---
 

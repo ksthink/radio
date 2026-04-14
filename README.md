@@ -42,11 +42,20 @@ chmod +x setup.sh
 
 더 많은 기능과 개인 라이브러리를 사용하려면 YouTube 로그인하기:
 
+**로컬 PC에서:**
 ```bash
-# 웹 UI에서: http://라디오IP:8080 → 설정 → YouTube 로그인
-# 또는 명령줄에서:
-python3 authenticate_youtube.py login
+# 1. get_youtube_headers.py 스크립트 사용
+python3 get_youtube_headers.py new
+
+# 또는 2. 기존 인증 정보 표시
+python3 get_youtube_headers.py show
 ```
+
+**라즈베리파이 웹 UI에서:**
+1. `http://라디오IP:8080` 접속
+2. **설정** 탭 → **YouTube Music 인증** 섹션
+3. 생성된 headers JSON 붙여넣기
+4. **YouTube 로그인** 버튼 클릭
 
 ### 5. 재부팅
 ```bash
