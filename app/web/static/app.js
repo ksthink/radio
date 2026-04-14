@@ -227,7 +227,26 @@
         const headersText = $("#youtube-headers").value.trim();
         
         if (!headersText) {
-            alert("❌ headers JSON을 붙여넣으세요\n\n설정 방법:\n1. 로컬 PC에서 명령 실행: python3 -c \"from ytmusicapi import YTMusic; YTMusic.auth.get_headers_from_browser()\"\n2. ~/.config/ytmusicapi/headers_auth.json 파일의 내용 복사\n3. 위 텍스트박스에 붙여넣기");
+            alert("❌ headers JSON을 붙여넣으세요\n\n📝 설정 방법:\n1. 로컬 PC 터미널에서: python3 get_youtube_headers.py\n2. 나오는 JSON 전체를 복사\n3. 위 텍스트박스에 붙여넣기");
+            return;
+        }
+        
+        // JSON 유효성 검사
+        try {
+            const parsed = JSON.parse(headersText);
+            
+            // 필수 필드 확인
+            if (!parsed.Authorization && !parsed.Cookie) {
+                alert("❌ JSON에 Authorization 또는 Cookie가 필요합니다.\n\n올바른 형식:\n\n방법 A) SAPISID 사용:\n{\n  \"Authorization\": \"SAPISIDHASH [값]\",\n  \"User-Agent\": \"Mozilla/5.0 ...\"\n}\n\n방법 B) Cookie 사용:\n{\n  \"Cookie\": \"...\",\n  \"User-Agent\": \"Mozilla/5.0 ...\"\n}");
+                return;
+            }
+            
+            if (!parsed["User-Agent"]) {
+                alert("❌ JSON에 User-Agent가 필요합니다.\n\n올바른 형식:\n{\n  \"Authorization\": \"SAPISIDHASH ...\",\n  \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ...\"\n}");
+                return;
+            }
+        } catch (e) {
+            alert("❌ JSON 형식이 올바르지 않습니다.\n\n오류: " + e.message + "\n\nJSON을 확인하고 다시 시도하세요.");
             return;
         }
         

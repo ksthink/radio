@@ -27,39 +27,59 @@ def create_headers_from_cookies():
    Windows/Linux: F12 또는 Ctrl+Shift+I
    Mac: Cmd+Option+I
 
-4️⃣  'Storage' 또는 'Application' 탭 클릭
+4️⃣  'Network' 탭 클릭
 
-5️⃣  왼쪽 메뉴에서 'Cookies' → 'music.youtube.com' 선택
+5️⃣  YouTube 페이지 새로고침 (F5)
 
-6️⃣  'SAPISID' 또는 'Cookie' 값 찾기
+6️⃣  Request Headers에서 다음 중 하나 찾기:
+   - Authorization 헤더 (SAPISIDHASH로 시작)
+   - 또는 Cookie 헤더 (여러 쿠키값)
 
-7️⃣  다음 중 하나를 선택:
+7️⃣  아래에서 방법 선택하기
 """)
     
-    print("\n   [방법 A] SAPISID 이용 (간단함)")
+    print("\n   [방법 A] Authorization 헤더 사용 (추천) 🌟")
     print("   " + "-"*60)
-    sapisid = input("\n   SAPISID 값을 붙여넣으세요 (없으면 Enter): ").strip()
+    print("   Network 탭의 요청 중 하나를 클릭")
+    print("   Request Headers에서 'Authorization' 값 찾기")
+    print("   예: Authorization: SAPISIDHASH w1gA-FcG33VXihqC/AP6d2HXWQYpPUYyHR\n")
+    auth = input("   'Authorization' 헤더 값을 붙여넣으세요 (없으면 Enter): ").strip()
     
-    if sapisid:
+    if auth:
+        # Authorization 헤더 그대로 사용
         headers = {
-            "Authorization": f"SAPISIDHASH {sapisid}",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "Authorization": auth,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         headers_json = json.dumps(headers, indent=2, ensure_ascii=False)
         save_and_display_headers(headers_json)
         return True
     
-    print("\n   [방법 B] 전체 Cookies 이용")
+    print("\n   [방법 B] SAPISID 값만 입력")
     print("   " + "-"*60)
-    print("   'Cookies' 리스트에서 모든 항목 선택 (Ctrl+A)")
-    print("   우측 클릭 → '복사' → 아래에 붙여넣기\n")
+    print("   Authorization 헤더에서 'SAPISIDHASH' 다음의 값만 복사\n")
+    sapisid = input("   SAPISID 값을 붙여넣으세요 (없으면 Enter): ").strip()
     
-    cookies_text = input("   Cookie 값들을 붙여넣으세요: ").strip()
+    if sapisid:
+        headers = {
+            "Authorization": f"SAPISIDHASH {sapisid}",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        headers_json = json.dumps(headers, indent=2, ensure_ascii=False)
+        save_and_display_headers(headers_json)
+        return True
+    
+    print("\n   [방법 C] Cookie 헤더 사용")
+    print("   " + "-"*60)
+    print("   Request Headers에서 'Cookie' 값 찾기")
+    print("   전체 쿠키 문자열을 복사\n")
+    
+    cookies_text = input("   Cookie 값을 붙여넣으세요: ").strip()
     
     if cookies_text:
         headers = {
             "Cookie": cookies_text,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         headers_json = json.dumps(headers, indent=2, ensure_ascii=False)
         save_and_display_headers(headers_json)

@@ -124,27 +124,105 @@ class YouTubeMusicPlayer:
             logger.error(f"브라우저 인증 실패: {e}")
             return False
 
-    def set_headers_from_json(self, headers_json: str) -> bool:
+    def set_headers_from_json(self, headers_json: str) -> tuple[bool, str]:
         """headers JSON 문자열로 직접 인증 (웹 UI에서 사용).
         
         로컬 PC에서 생성한 headers.json 내용을 직접 입력.
+        
+        Returns:
+            (성공 여부, 메시지)
         """
         try:
             import json
+            
+            # JSON 파싱
+            if not headers_json or not headers_json.strip():
+                msg = "❌ JSON이 비어있습니다. get_youtube_headers.py에서 생성한 JSON을 붙여넣으세요."
+                logger.error(msg)
+                return False, msg
+            
             headers = json.loads(headers_json)
+            
+            # 필수 키 검증
+            has_auth = "Authorization" in headers
+            has_cookie = "Cookie" in headers
+            has_user_agent = "User-Agent" in headers
+            
+            if not (has_auth or has_cookie):
+                msg = """❌ JSON 형식이 올바르지 않습니다.
+                
+올바른 형식:
+방법 A) SAPISID 사용:
+{
+  "Authorization": "SAPISIDHASH [SAPISID 값]",
+  "User-Agent": "Mozilla/5.0 ..."
+}
+
+방법 B) Cookie 사용:
+{
+  "Cookie": "[쿠키 문자열]",
+  "User-Agent": "Mozilla/5.0 ..."
+}
+
+❗ User-Agent 헤더는 필수입니다."""
+                logger.error(msg)
+                return False, msg
+            
+            if not has_user_agent:
+                msg = """❌ User-Agent 헤더가 없습니다.
+                
+올바른 형식:
+{
+  "Authorization": "SAPISIDHASH ...",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ..."
+}"""
+                logger.error(msg)
+                return False, msg
+            
+            # 파일 저장
             self.auth_file.write_text(json.dumps(headers, indent=2))
             self._ytmusic = None  # 캐시 초기화
             
             # 인증 테스트
-            yt = self._get_ytmusic()
-            logger.info("✓ 인증 테스트 성공")
-            return True
-        except json.JSONDecodeError:
-            logger.error("JSON 형식이 올바르지 않음")
-            return False
+            try:
+                yt = self._get_ytmusic()
+                logger.info("✓ 인증 테스트 성공")
+                return True, "✅ YouTube 인증 성공!"
+            except Exception as auth_error:
+                error_msg = str(auth_error).lower()
+                if "unauthorized" in error_msg or "auth" in error_msg:
+                    msg = f"""❌ 인증 정보가 유효하지 않습니다.
+                    
+YouTube Music 로그아웃 후 다시 로그인하고,
+get_youtube_headers.py를 다시 실행하여 새로운 헤더를 생성하세요.
+
+오류: {auth_error}"""
+                else:
+                    msg = f"❌ 인증 테스트 실패: {auth_error}"
+                logger.error(msg)
+                return False, msg
+                
+        except json.JSONDecodeError as e:
+            msg = f"""❌ JSON 형식이 올바르지 않습니다.
+            
+JSON 파싱 오류: {e}
+
+올바른 형식:
+{{
+  "Authorization": "SAPISIDHASH [값]",
+  "User-Agent": "Mozilla/5.0 ..."
+}}
+
+🔧 해결 방법:
+1. get_youtube_headers.py 실행: python3 get_youtube_headers.py
+2. 나오는 JSON 전체를 복사
+3. 웹 UI 텍스트박스에 붙여넣기"""
+            logger.error(msg)
+            return False, msg
         except Exception as e:
-            logger.error(f"인증 설정 실패: {e}")
-            return False
+            msg = f"❌ 인증 설정 실패: {e}"
+            logger.error(msg)
+            return False, msg
 
     def set_api_key(self, api_key: str):
         """API 키로 인증 (옵션)."""

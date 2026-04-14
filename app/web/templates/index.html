@@ -134,7 +134,19 @@
                 <div id="youtube-auth-status" class="auth-status"></div>
                 
                 <div class="youtube-auth-instructions">
-                    <p><strong>설정 방법 (개발자 도구 사용):</strong></p>
+                    <p><strong>⚡ 최간단 방법 (추천):</strong></p>
+                    <ol>
+                        <li><strong>로컬 PC 터미널</strong>에서 실행:
+                            <code style="display: block; background: #f0f0f0; padding: 4px; border-radius: 3px; font-family: monospace; margin: 4px 0;">python3 get_youtube_headers.py</code>
+                        </li>
+                        <li>나오는 JSON을 <strong>전체 복사</strong></li>
+                        <li>아래 텍스트박스에 붙여넣기</li>
+                        <li>"YouTube 로그인" 버튼 클릭</li>
+                    </ol>
+                    
+                    <hr style="margin: 12px 0; opacity: 0.3;">
+                    
+                    <p><strong>📖 수동 방법 (개발자 도구 사용):</strong></p>
                     <ol>
                         <li><strong>로컬 PC</strong>에서 YouTube Music 웹사이트 방문:
                             <a href="https://music.youtube.com" target="_blank">https://music.youtube.com</a>
@@ -144,16 +156,26 @@
                             브라우저 개발자 도구 열기:
                             <code>Windows/Linux: F12</code> 또는 <code>Mac: Cmd+Option+I</code>
                         </li>
-                        <li>'Storage' 또는 'Application' 탭 클릭</li>
-                        <li>왼쪽 메뉴에서 'Cookies' → 'music.youtube.com' 선택</li>
-                        <li>'SAPISID' 또는 다른 Cookie 값을 찾아서 복사</li>
-                        <li>아래 텍스트박스에 붙여넣기</li>
-                        <li>"YouTube 로그인" 버튼 클릭</li>
+                        <li>'Network' 탭에서 any YouTube request의 'Request Headers' 확인</li>
+                        <li><strong>Authorization</strong> 또는 <strong>Cookie</strong> 헤더 복사</li>
+                        <li>아래 JSON 형식으로 작성하여 붙여넣기</li>
                     </ol>
-                    <p style="margin-top: 12px; font-size: 0.8rem;"><strong>팁:</strong> 로컬 PC에서 <code>python3 get_youtube_headers.py new</code> 도구를 사용하면 더 쉽습니다!</p>
+                    
+                    <p style="margin-top: 12px; font-size: 0.85rem; background: #fff3cd; padding: 8px; border-radius: 3px;"><strong>✓ 올바른 JSON 형식:</strong></p>
+                    <pre style="background: #f5f5f5; padding: 8px; border-radius: 3px; font-size: 0.75rem; overflow-x: auto; margin: 4px 0;">방법 A) SAPISID:
+{
+  "Authorization": "SAPISIDHASH [복사한값]",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}
+
+방법 B) Cookie:
+{
+  "Cookie": "[복사한쿠키값]",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}</pre>
                 </div>
                 
-                <textarea id="youtube-headers" class="youtube-headers-input" placeholder="{'Access-Control-Allow-Credentials': 'true', ...}" rows="8"></textarea>
+                <textarea id="youtube-headers" class="youtube-headers-input" placeholder="{&#10;  &quot;Authorization&quot;: &quot;SAPISIDHASH ...&quot;,&#10;  &quot;User-Agent&quot;: &quot;Mozilla/5.0 ...&quot;&#10;}" rows="8"></textarea>
                 <button class="btn-primary" id="btn-youtube-login">YouTube 로그인</button>
                 <button class="btn-secondary" id="btn-youtube-check">상태 확인</button>
                 <button class="btn-secondary" id="btn-load-library">📚 라이브러리 불러오기</button>

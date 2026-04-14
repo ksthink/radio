@@ -426,6 +426,7 @@ def api_youtube_liked_songs():
     except Exception as e:
         logger.error("좋아하는 곡 로드 오류: %s", e)
         return jsonify({"error": str(e), "tracks": []}), 500
+@app.route("/api/youtube/auth", methods=["POST"])
 def api_youtube_auth():
     """YouTube 인증 처리."""
     if not _radio:
@@ -440,21 +441,20 @@ def api_youtube_auth():
             if not headers_json:
                 return jsonify({
                     "ok": False,
-                    "message": "headers JSON이 필요합니다",
-                    "instruction": "로컬 PC에서 다음 명령 실행:\npython3 -c \"from ytmusicapi import YTMusic; YTMusic.auth.get_headers_from_browser()\"\n그후 ~/.config/ytmusicapi/headers_auth.json의 내용을 복사해서 입력하세요."
+                    "message": "❌ headers JSON이 필요합니다\n\n설정 방법:\n1. 로컬 PC에서 python3 get_youtube_headers.py 실행\n2. 나오는 JSON 전체를 복사\n3. 웹 UI 텍스트박스에 붙여넣기"
                 }), 400
             
-            success = _radio.yt_player.set_headers_from_json(headers_json)
+            success, message = _radio.yt_player.set_headers_from_json(headers_json)
             if success:
                 return jsonify({
                     "ok": True,
-                    "message": "YouTube 인증 성공!",
+                    "message": message,
                     "authenticated": True
                 })
             else:
                 return jsonify({
                     "ok": False,
-                    "message": "JSON 형식이 올바르지 않거나 인증 실패",
+                    "message": message,
                     "authenticated": False
                 }), 400
         
