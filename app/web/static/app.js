@@ -183,7 +183,7 @@
     // ─── PLAYER CONTROLS ───
     function setupControls() {
         $("#btn-play").onclick = () => post("/api/play");
-        $("#btn-prev").onclick = () => post("/api/prev");
+        $("#btn-prev").onclick = () => post("/api/previous");
         $("#btn-next").onclick = () => post("/api/next");
         $("#btn-stop").onclick = () => post("/api/stop");
 
