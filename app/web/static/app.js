@@ -208,6 +208,88 @@
         return div.innerHTML;
     }
 
+    // ─── YouTube 인증 ───
+    async function checkYouTubeAuth() {
+        const data = await post("/api/youtube/auth", { action: "check" });
+        const statusEl = $("#youtube-auth-status");
+        if (!data) {
+            statusEl.innerHTML = '<div class="status-error">⚠️ 인증 상태 확인 실패</div>';
+            return;
+        }
+        if (data.authenticated) {
+            statusEl.innerHTML = '<div class="status-ok">✅ YouTube 로그인됨</div>';
+        } else {
+            statusEl.innerHTML = '<div class="status-warning">🔓 로그인 필요</div>';
+        }
+    }
+
+    async function loginYouTube() {
+        const btn = $("#btn-youtube-login");
+        btn.disabled = true;
+        btn.textContent = "로그인 중...";
+        
+        const data = await post("/api/youtube/auth", { action: "login" });
+        
+        if (data && data.ok) {
+            alert("✅ YouTube 로그인 성공!");
+            checkYouTubeAuth();
+        } else {
+            alert("❌ YouTube 로그인 실패\n오류: " + (data ? data.message : "알 수 없는 오류"));
+        }
+        
+        btn.disabled = false;
+        btn.textContent = "YouTube 로그인";
+    }
+
+    // ─── 버튼 진단 ───
+    async function diagnoseButtons() {
+        const resultEl = $("#diagnose-result");
+        resultEl.innerHTML = '<div class="loading">진단 중...</div>';
+        
+        const data = await api("/api/buttons/diagnose");
+        if (!data) {
+            resultEl.innerHTML = '<div class="status-error">진단 실패</div>';
+            return;
+        }
+
+        let html = '<div class="diagnose-info">';
+        html += `<p><strong>GPIO 사용 가능:</strong> ${data.gpio_available ? '✅ 예' : '❌ 아니오'}</p>`;
+        html += `<p><strong>버튼 초기화:</strong> ${data.buttons_initialized}/4</p>`;
+        html += `<p><strong>길게누르기:</strong> ${data.long_press_ms}ms</p>`;
+        html += `<p><strong>디바운싱:</strong> ${data.debounce_ms}ms</p>`;
+        html += '<p><strong>개별 버튼 상태:</strong></p>';
+        html += '<ul>';
+        for (const [name, info] of Object.entries(data.buttons)) {
+            const status = info.initialized ? '✅' : '❌';
+            html += `<li>${name.toUpperCase()} (BCM ${info.pin}): ${status} ${info.state}</li>`;
+        }
+        html += '</ul>';
+        html += '</div>';
+        
+        resultEl.innerHTML = html;
+    }
+
+    // ─── 버튼 테스트 ───
+    async function testButton(button, long) {
+        const resultEl = $("#test-result");
+        resultEl.innerHTML = `<div class="loading">테스트 중... (버튼 ${button.toUpperCase()} ${long ? '길게' : '짧게'})</div>`;
+        
+        const data = await post("/api/buttons/test", { 
+            button: button.toLowerCase(), 
+            long: long === 'true' || long === true 
+        });
+        
+        if (data && data.ok) {
+            resultEl.innerHTML = `<div class="status-ok">✅ ${data.message}</div>`;
+        } else {
+            resultEl.innerHTML = `<div class="status-error">❌ 테스트 실패</div>`;
+        }
+        
+        setTimeout(function () {
+            resultEl.innerHTML = '';
+        }, 3000);
+    }
+
     // ─── 초기화 ───
     function init() {
         // 탭 전환
@@ -279,6 +361,21 @@
             post("/api/alarms", { hour: hour, minute: minute, days: days, label: label }).then(function () {
                 $("#alarm-label").value = "";
                 loadAlarms();
+            });
+        });
+
+        // YouTube 인증
+        checkYouTubeAuth();
+        $("#btn-youtube-login").addEventListener("click", loginYouTube);
+        $("#btn-youtube-check").addEventListener("click", checkYouTubeAuth);
+
+        // 버튼 진단
+        $("#btn-diagnose").addEventListener("click", diagnoseButtons);
+
+        // 버튼 테스트
+        $$(".btn-test").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                testButton(this.dataset.button, this.dataset.long);
             });
         });
 

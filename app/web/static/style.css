@@ -400,3 +400,141 @@ body {
     .ctrl-btn { width: 44px; height: 44px; font-size: 1.1rem; }
     .ctrl-btn-main { width: 56px; height: 56px; }
 }
+
+/* 설정 탭 */
+.settings-section {
+    background: var(--bg-card);
+    border: 1px solid #222;
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.settings-section h3 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+    color: var(--accent);
+}
+
+.settings-section p {
+    margin: 8px 0;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+}
+
+.settings-section a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.auth-status {
+    margin-bottom: 12px;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.status-ok {
+    background: rgba(0, 255, 100, 0.1);
+    color: var(--green);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.status-error {
+    background: rgba(255, 51, 68, 0.1);
+    color: var(--red);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.status-warning {
+    background: rgba(255, 136, 0, 0.1);
+    color: var(--orange);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.btn-primary,
+.btn-secondary {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 8px;
+    background: var(--bg-hover);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover,
+.btn-secondary:hover {
+    background: var(--accent);
+    color: var(--bg);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.button-test-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.btn-test {
+    padding: 12px;
+    background: var(--bg-hover);
+    border: 1px solid #444;
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.btn-test:hover {
+    background: var(--accent);
+    color: var(--bg);
+}
+
+.diagnose-result,
+.test-result {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(0, 200, 255, 0.05);
+    border: 1px solid #0080aa;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.diagnose-info ul {
+    list-style: none;
+    margin-left: 0;
+}
+
+.diagnose-info li {
+    padding: 4px 0;
+    color: var(--text);
+}
+
+.loading {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 12px;
+}
+
+.note {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+}

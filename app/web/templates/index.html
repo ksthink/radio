@@ -21,6 +21,7 @@
             <button class="tab" data-tab="channels">채널</button>
             <button class="tab" data-tab="search">검색</button>
             <button class="tab" data-tab="alarm">알람</button>
+            <button class="tab" data-tab="settings">설정</button>
         </nav>
 
         <!-- 재생 탭 -->
@@ -125,7 +126,45 @@
                 <button class="btn-add" id="btn-add-alarm">알람 추가</button>
             </div>
         </section>
-    </div>
+
+        <!-- 설정 탭 -->
+        <section id="tab-settings" class="tab-content">
+            <div class="settings-section">
+                <h3>🔐 YouTube Music</h3>
+                <div id="youtube-auth-status" class="auth-status"></div>
+                <button class="btn-primary" id="btn-youtube-login">YouTube 로그인</button>
+                <button class="btn-secondary" id="btn-youtube-check">상태 확인</button>
+            </div>
+
+            <div class="settings-section">
+                <h3>🎮 버튼 진단</h3>
+                <button class="btn-secondary" id="btn-diagnose">진단 실행</button>
+                <div id="diagnose-result" class="diagnose-result"></div>
+            </div>
+
+            <div class="settings-section">
+                <h3>🎮 버튼 테스트</h3>
+                <p class="note">각 버튼을 테스트하려면 아래 버튼을 클릭하세요</p>
+                <div class="button-test-grid">
+                    <button class="btn-test" data-button="a" data-long="false">A (짧게)</button>
+                    <button class="btn-test" data-button="a" data-long="true">A (길게)</button>
+                    <button class="btn-test" data-button="b" data-long="false">B (짧게)</button>
+                    <button class="btn-test" data-button="b" data-long="true">B (길게)</button>
+                    <button class="btn-test" data-button="x" data-long="false">X (짧게)</button>
+                    <button class="btn-test" data-button="x" data-long="true">X (길게)</button>
+                    <button class="btn-test" data-button="y" data-long="false">Y (짧게)</button>
+                    <button class="btn-test" data-button="y" data-long="true">Y (길게)</button>
+                </div>
+                <div id="test-result" class="test-result"></div>
+            </div>
+
+            <div class="settings-section">
+                <h3>ℹ️ 정보</h3>
+                <p><strong>버전:</strong> PiRadio v2.0</p>
+                <p><strong>최적화:</strong> URL 캐싱, 병렬 처리</p>
+                <p><a href="https://github.com/ksthink/radio" target="_blank">GitHub 저장소</a></p>
+            </div>
+        </section>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
     <script src="/static/app.js"></script>
