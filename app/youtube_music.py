@@ -1,12 +1,19 @@
 """YouTube Music 통합 모듈 - yt-dlp + ytmusicapi"""
 
 import logging
+import os
 import subprocess
+import sys
 import json
 import threading
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# virtualenv 내 yt-dlp 절대경로 (systemd에서 PATH 문제 방지)
+YT_DLP_BIN = os.path.join(os.path.dirname(sys.executable), "yt-dlp")
+if not os.path.exists(YT_DLP_BIN):
+    YT_DLP_BIN = "yt-dlp"
 
 
 class YouTubeMusicPlayer:
@@ -21,6 +28,7 @@ class YouTubeMusicPlayer:
         self._current_index = 0
         self._current_channel = None
         self._lock = threading.Lock()
+        self._radio_fail_ids = set()  # 라디오 트랙 가져오기 실패한 ID 캐시
 
     def _get_ytmusic(self):
         """ytmusicapi 인스턴스를 반환 (지연 로딩)."""
@@ -40,7 +48,7 @@ class YouTubeMusicPlayer:
         try:
             result = subprocess.run(
                 [
-                    "yt-dlp",
+                    YT_DLP_BIN,
                     "--no-playlist",
                     "-f", self.quality,
                     "--get-url",
@@ -72,7 +80,7 @@ class YouTubeMusicPlayer:
         try:
             result = subprocess.run(
                 [
-                    "yt-dlp",
+                    YT_DLP_BIN,
                     "--no-playlist",
                     "-j",
                     "--no-warnings",
@@ -96,11 +104,24 @@ class YouTubeMusicPlayer:
         filter_type: "songs", "videos", "albums", "artists", "playlists", "podcasts"
         """
         yt = self._get_ytmusic()
-        results = yt.search(query, filter=filter_type, limit=limit)
+        # filter 검색 시도, 결과 없으면 필터 없이 재시도
+        try:
+            results = yt.search(query, filter=filter_type, limit=limit)
+        except Exception:
+            results = []
+        if not results:
+            try:
+                results = yt.search(query, limit=limit)
+            except Exception as e:
+                logger.error("검색 실패: %s", e)
+                results = []
         tracks = []
         for item in results:
+            video_id = item.get("videoId")
+            if not video_id:
+                continue  # videoId 없는 결과 건너뛰기 (앨범, 아티스트 등)
             track = {
-                "id": item.get("videoId") or item.get("browseId", ""),
+                "id": video_id,
                 "title": item.get("title", "알 수 없음"),
                 "artist": "",
                 "duration": item.get("duration", ""),
@@ -108,7 +129,7 @@ class YouTubeMusicPlayer:
             }
             artists = item.get("artists", [])
             if artists:
-                track["artist"] = ", ".join(a.get("name", "") for a in artists)
+                track["artist"] = ", ".join(a.get("name", "") for a in artists if a)
             thumbnail = item.get("thumbnails", [{}])
             track["thumbnail"] = thumbnail[-1].get("url", "") if thumbnail else ""
             tracks.append(track)
@@ -254,9 +275,15 @@ class YouTubeMusicPlayer:
                     # 큐 끝에 도달: 라디오 모드면 새 트랙 가져오기
                     if self._current_channel and self._current_queue:
                         last_id = self._current_queue[-1]["id"]
+                        if last_id in self._radio_fail_ids:
+                            return  # 이미 실패한 ID는 재시도하지 않음
                         new_tracks = self.get_radio_tracks(last_id)
                         if new_tracks:
                             self._current_queue.extend(new_tracks[1:])
+                        else:
+                            self._radio_fail_ids.add(last_id)
+                            logger.warning("라디오 트랙 가져오기 실패, 재시도 안 함: %s", last_id)
+                            return
 
                 end = min(
                     self._current_index + self.buffer_tracks,

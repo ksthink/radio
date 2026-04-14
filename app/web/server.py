@@ -38,29 +38,32 @@ def api_status():
     """현재 상태 반환."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
+    try:
+        status = _radio.mpd.get_status()
+        current = _radio.yt_player.get_current_track_info()
+        volume = _radio.mpd.get_volume()
+        channel = _radio.favorites.get_current()
 
-    status = _radio.mpd.get_status()
-    current = _radio.yt_player.get_current_track_info()
-    volume = _radio.mpd.get_volume()
-    channel = _radio.favorites.get_current()
-
-    return jsonify({
-        "state": status.get("state", "stop"),
-        "volume": volume,
-        "track": {
-            "title": current.get("title", "") if current else "",
-            "artist": current.get("artist", "") if current else "",
-            "thumbnail": current.get("thumbnail", "") if current else "",
-        },
-        "channel": {
-            "name": channel.get("name", "") if channel else "",
-            "index": _radio.favorites.get_current_index(),
-        },
-        "elapsed": float(status.get("elapsed", 0)),
-        "duration": float(status.get("duration", 0)),
-        "alarm": _radio.alarm.get_next_alarm_str(),
-        "sleep_remaining": _radio.alarm.get_sleep_remaining(),
-    })
+        return jsonify({
+            "state": status.get("state", "stop"),
+            "volume": volume,
+            "track": {
+                "title": current.get("title", "") if current else "",
+                "artist": current.get("artist", "") if current else "",
+                "thumbnail": current.get("thumbnail", "") if current else "",
+            },
+            "channel": {
+                "name": channel.get("name", "") if channel else "",
+                "index": _radio.favorites.get_current_index(),
+            },
+            "elapsed": float(status.get("elapsed", 0)),
+            "duration": float(status.get("duration", 0)),
+            "alarm": _radio.alarm.get_next_alarm_str(),
+            "sleep_remaining": _radio.alarm.get_sleep_remaining(),
+        })
+    except Exception as e:
+        logger.error("상태 조회 오류: %s", e)
+        return jsonify({"state": "stop", "volume": 50, "track": {}, "channel": {}, "elapsed": 0, "duration": 0})
 
 
 @app.route("/api/play", methods=["POST"])
@@ -68,8 +71,12 @@ def api_play():
     """재생/일시정지."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    _radio.toggle_play_pause()
-    return jsonify({"ok": True})
+    try:
+        _radio.toggle_play_pause()
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.error("재생 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/stop", methods=["POST"])
@@ -77,8 +84,12 @@ def api_stop():
     """정지."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    _radio.mpd.stop()
-    return jsonify({"ok": True})
+    try:
+        _radio.mpd.stop()
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.error("정지 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/next", methods=["POST"])
@@ -86,8 +97,12 @@ def api_next():
     """다음 채널."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    _radio.next_channel()
-    return jsonify({"ok": True})
+    try:
+        _radio.next_channel()
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.error("다음 채널 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/previous", methods=["POST"])
@@ -95,8 +110,12 @@ def api_previous():
     """이전 채널."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    _radio.previous_channel()
-    return jsonify({"ok": True})
+    try:
+        _radio.previous_channel()
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.error("이전 채널 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/volume", methods=["POST"])
@@ -104,28 +123,40 @@ def api_volume():
     """볼륨 설정."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    data = request.get_json(silent=True) or {}
-    vol = data.get("volume")
-    if vol is not None:
-        vol = max(0, min(100, int(vol)))
-        _radio.mpd.set_volume(vol)
-    return jsonify({"volume": _radio.mpd.get_volume()})
+    try:
+        data = request.get_json(silent=True) or {}
+        vol = data.get("volume")
+        if vol is not None:
+            vol = max(0, min(100, int(vol)))
+            _radio.mpd.set_volume(vol)
+        return jsonify({"volume": _radio.mpd.get_volume()})
+    except Exception as e:
+        logger.error("볼륨 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/volume/up", methods=["POST"])
 def api_volume_up():
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    vol = _radio.mpd.volume_up(_radio.config["volume"]["step"])
-    return jsonify({"volume": vol})
+    try:
+        vol = _radio.mpd.volume_up(_radio.config["volume"]["step"])
+        return jsonify({"volume": vol})
+    except Exception as e:
+        logger.error("볼륨 업 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/volume/down", methods=["POST"])
 def api_volume_down():
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    vol = _radio.mpd.volume_down(_radio.config["volume"]["step"])
-    return jsonify({"volume": vol})
+    try:
+        vol = _radio.mpd.volume_down(_radio.config["volume"]["step"])
+        return jsonify({"volume": vol})
+    except Exception as e:
+        logger.error("볼륨 다운 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 # ─────────── 채널 API ───────────
@@ -135,10 +166,14 @@ def api_channels():
     """채널 목록."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    return jsonify({
-        "channels": _radio.favorites.get_channels(),
-        "current": _radio.favorites.get_current_index(),
-    })
+    try:
+        return jsonify({
+            "channels": _radio.favorites.get_channels(),
+            "current": _radio.favorites.get_current_index(),
+        })
+    except Exception as e:
+        logger.error("채널 목록 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/channels/<int:index>/play", methods=["POST"])
@@ -146,8 +181,12 @@ def api_channel_play(index):
     """특정 채널 재생."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    _radio.play_channel(index)
-    return jsonify({"ok": True})
+    try:
+        _radio.play_channel(index)
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.error("채널 재생 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/channels", methods=["POST"])
@@ -205,13 +244,17 @@ def api_search_play():
     """검색 결과 재생."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    data = request.get_json(silent=True) or {}
-    video_id = data.get("id", "")
-    title = data.get("title", "")
-    if not video_id:
-        return jsonify({"error": "ID 필요"}), 400
-    success = _radio.yt_player.play_track(video_id, title)
-    return jsonify({"ok": success})
+    try:
+        data = request.get_json(silent=True) or {}
+        video_id = data.get("id", "")
+        title = data.get("title", "")
+        if not video_id:
+            return jsonify({"error": "ID 필요"}), 400
+        success = _radio.yt_player.play_track(video_id, title)
+        return jsonify({"ok": success})
+    except Exception as e:
+        logger.error("검색 재생 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 # ─────────── 알람 API ───────────
@@ -221,10 +264,14 @@ def api_alarms():
     """알람 목록."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    return jsonify({
-        "alarms": _radio.alarm.get_alarms(),
-        "next": _radio.alarm.get_next_alarm_str(),
-    })
+    try:
+        return jsonify({
+            "alarms": _radio.alarm.get_alarms(),
+            "next": _radio.alarm.get_next_alarm_str(),
+        })
+    except Exception as e:
+        logger.error("알람 목록 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/alarms", methods=["POST"])
@@ -265,13 +312,17 @@ def api_sleep_timer():
     """슬립 타이머 설정."""
     if not _radio:
         return jsonify({"error": "초기화 중"}), 503
-    data = request.get_json(silent=True) or {}
-    minutes = data.get("minutes", 30)
-    if minutes <= 0:
-        _radio.alarm.cancel_sleep_timer()
-    else:
-        _radio.alarm.start_sleep_timer(minutes, on_sleep=_radio.mpd.stop)
-    return jsonify({"ok": True, "minutes": minutes})
+    try:
+        data = request.get_json(silent=True) or {}
+        minutes = data.get("minutes", 30)
+        if minutes <= 0:
+            _radio.alarm.cancel_sleep_timer()
+        else:
+            _radio.alarm.start_sleep_timer(minutes, on_sleep=_radio.mpd.stop)
+        return jsonify({"ok": True, "minutes": minutes})
+    except Exception as e:
+        logger.error("슬립 타이머 오류: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 # ─────────── WebSocket 이벤트 ───────────

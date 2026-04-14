@@ -6,39 +6,8 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# 기본 채널 프리셋
-DEFAULT_CHANNELS = [
-    {
-        "id": "jknsBGPHMbKHp8MR",
-        "name": "한국 인디 라디오",
-        "type": "playlist",
-        "description": "Korean Indie Mix",
-    },
-    {
-        "id": "RDCLAK5uy_kmPRjvjUFbcgN1vELS98KBFpMj4u_iQU0",
-        "name": "K-Pop 히트곡",
-        "type": "playlist",
-        "description": "K-Pop Hits",
-    },
-    {
-        "id": "RDCLAK5uy_n9Fbaf4e1IbcKaGBGlZMECEN5qVJgEEJo",
-        "name": "재즈 라운지",
-        "type": "playlist",
-        "description": "Jazz Lounge",
-    },
-    {
-        "id": "RDCLAK5uy_lcbj-YzuBOkpR1ivXjGsSh8YKnDVZFmpA",
-        "name": "로파이 힙합",
-        "type": "playlist",
-        "description": "Lo-Fi Hip Hop",
-    },
-    {
-        "id": "RDCLAK5uy_m1LIVK7a19vlOkWy20u3c8MI0pJqPVqzpo",
-        "name": "클래식 명곡",
-        "type": "playlist",
-        "description": "Classical Essentials",
-    },
-]
+# 기본 채널 프리셋 (빈 상태로 시작, 웹 UI에서 검색 후 추가)
+DEFAULT_CHANNELS = []
 
 
 class FavoritesManager:

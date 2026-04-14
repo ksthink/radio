@@ -117,7 +117,14 @@ class PiRadio:
             if self.mpd.playlist_length() == 0:
                 channel = self.favorites.get_current()
                 if channel:
-                    self.yt_player.play_channel(channel)
+                    try:
+                        self.yt_player.play_channel(channel)
+                    except Exception as e:
+                        logger.error("채널 재생 실패: %s", e)
+                        return
+                else:
+                    logger.info("재생할 채널 없음")
+                    return
             else:
                 self.mpd.play()
             self.display.set_mode(DisplayManager.MODE_NOW_PLAYING)
